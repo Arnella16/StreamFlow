@@ -134,10 +134,10 @@ func main() {
 
 	// Add CORS middleware for frontend usage
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*", // In production, specify your frontend domain
+		AllowOrigins:     "*", // Common Vite dev server ports
 		AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
-		AllowHeaders:     "*",
-		AllowCredentials: false,
+		AllowHeaders:     "Content-Type,Authorization",
+		AllowCredentials: true,
 	}))
 
 	// Serve static files from public directory
@@ -146,6 +146,11 @@ func main() {
 	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "healthy", "timestamp": time.Now()})
+	})
+
+	// Favicon route to prevent 404 errors
+	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
 	})
 
 	// Auth routes (no middleware) - these should be public
@@ -257,7 +262,7 @@ func (db *DatabaseService) createUser(userReq *UserRequest) (*User, error) {
 
 	// Log user creation
 	db.logger.WithFields(logrus.Fields{
-		"user_id": user.ID.Hex(),
+		"user_id":  user.ID.Hex(),
 		"username": user.Username,
 	}).Info("User created successfully")
 
@@ -293,7 +298,7 @@ func (db *DatabaseService) authenticateUser(loginReq *LoginRequest) (*User, erro
 	}
 
 	db.logger.WithFields(logrus.Fields{
-		"user_id": user.ID.Hex(),
+		"user_id":  user.ID.Hex(),
 		"username": user.Username,
 	}).Info("User authenticated successfully")
 
@@ -465,10 +470,10 @@ func customErrorHandler(c *fiber.Ctx, err error) error {
 	}
 
 	logger.WithFields(logrus.Fields{
-		"error": err.Error(),
-		"path":  c.Path(),
+		"error":  err.Error(),
+		"path":   c.Path(),
 		"method": c.Method(),
-		"ip":    c.IP(),
+		"ip":     c.IP(),
 	}).Error("Request error")
 
 	return c.Status(code).JSON(fiber.Map{
@@ -706,4 +711,3 @@ func deleteUsers(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "User deleted successfully"})
 }
-

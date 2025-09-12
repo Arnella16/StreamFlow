@@ -20,7 +20,12 @@ interface UserForm {
   password: string;
 }
 
-const UserRegistrationForm = () => {
+interface UserRegistrationFormProps {
+  onRegister: (userData: any) => void;
+  onSwitchToLogin: () => void;
+}
+
+const UserRegistrationForm = ({ onRegister, onSwitchToLogin }: UserRegistrationFormProps) => {
   const [formData, setFormData] = useState<UserForm>({
     username: "",
     email: "",
@@ -40,7 +45,7 @@ const UserRegistrationForm = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:3000/api/users", {
+      const res = await fetch("http://localhost:3000/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -49,12 +54,21 @@ const UserRegistrationForm = () => {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.message || `Error: ${res.status}`);
+        throw new Error(data.error || `Error: ${res.status}`);
       }
 
+      // Store the token in localStorage
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user_info', JSON.stringify(data.user));
+      }
+      
       setStatus("success");
-      setMessage("✅ Registration successful! You can now sign in.");
+      setMessage("✅ Registration successful! You are now logged in.");
       setFormData({ username: "", email: "", password: "" });
+      
+      // Call the onRegister callback with user data
+      onRegister(data.user);
     } catch (err: any) {
       console.error("Registration error:", err);
       setStatus("error");
@@ -150,7 +164,7 @@ const UserRegistrationForm = () => {
 
             <Text fontSize="sm" textAlign="center" color={useColorModeValue("gray.600", "gray.400")} mt={2}>
               Already have an account?{" "}
-              <Link color="blue.500" fontWeight="semibold" href="#">
+              <Link color="blue.500" fontWeight="semibold" onClick={onSwitchToLogin} cursor="pointer">
                 Sign in
               </Link>
             </Text>

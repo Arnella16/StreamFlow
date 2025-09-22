@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -15,16 +16,42 @@ import (
 var serviceProcs []*os.Process
 
 func killPort(port string) {
-	out, err := exec.Command("lsof", "-ti", "tcp:"+port).Output()
-	if err != nil {
-		log.Printf("No process found on port %s or lsof error: %v", port, err)
-		return
-	}
-	pids := strings.Fields(string(out))
-	for _, pid := range pids {
-		exec.Command("kill", "-9", pid).Run()
-		log.Printf("Killed process %s on port %s", pid, port)
-	}
+    switch runtime.GOOS {
+    case "windows":
+        // PowerShell script to kill a process only if it exists
+        psCmd := `
+        $conn = Get-NetTCPConnection -LocalPort ` + port + ` -ErrorAction SilentlyContinue
+        if ($conn) {
+            $pid = $conn.OwningProcess
+            if ($pid) {
+                Stop-Process -Id $pid -Force
+                Write-Output "Killed process $pid on port ` + port + `"
+            } else {
+                Write-Output "No PID found for port ` + port + `"
+            }
+        } else {
+            Write-Output "No process found on port ` + port + `"
+        }`
+
+        cmd := exec.Command("powershell", "-Command", psCmd)
+        out, err := cmd.CombinedOutput()
+        if err != nil {
+            log.Printf("Error checking/killing port %s: %v", port, err)
+        }
+        log.Printf("%s", strings.TrimSpace(string(out)))
+
+    default: // Linux/macOS
+        out, err := exec.Command("lsof", "-ti", "tcp:"+port).Output()
+        if err != nil {
+            log.Printf("No process found on port %s or lsof error: %v", port, err)
+            return
+        }
+        pids := strings.Fields(string(out))
+        for _, pid := range pids {
+            exec.Command("kill", "-9", pid).Run()
+            log.Printf("Killed process %s on port %s", pid, port)
+        }
+    }
 }
 
 func startService(name, dir string) {
@@ -74,7 +101,7 @@ func main() {
 
 	// Enable CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*", // Common Vite dev server ports
+		AllowOrigins:     "http://localhost:3000, http://127.0.0.1:3000", // Common Vite dev server ports
 		AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,

@@ -237,10 +237,10 @@ func (db *DatabaseService) createUser(userReq *UserRequest) (*User, error) {
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
-	err = bcrypt.CompareHashAndPassword([]byte(userReq.Password), []byte(hashedPassword))
 	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, fmt.Errorf("error hashing password: %w", err)
 	}
+
 
 	// Create user
 	user := &User{

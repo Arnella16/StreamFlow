@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import UserRegistrationForm from './components/UserRegistrationForm';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
+import UserProfile from './components/UserProfile';
 import Navbar from './components/Navbar';
 
-type AuthMode = 'login' | 'register' | 'dashboard';
+type AuthMode = 'login' | 'register' | 'dashboard' | 'profile';
 
 interface User {
   _id: string;
@@ -53,6 +54,10 @@ function App() {
     setAuthMode('login');
   };
 
+  const handleViewProfile = () => {
+    setAuthMode('profile');
+  };
+
   const renderContent = () => {
     switch (authMode) {
       case 'login':
@@ -74,8 +79,16 @@ function App() {
           <Dashboard 
             user={user}
             onLogout={handleLogout}
+            onViewProfile={handleViewProfile}
           />
         ) : null;
+      case 'profile':
+      return user ? (
+        <UserProfile 
+          user={user}
+          onGoBack={() => setAuthMode('dashboard')}
+        />
+      ) : null;
       default:
         return null;
     }

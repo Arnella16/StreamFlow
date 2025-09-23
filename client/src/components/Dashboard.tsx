@@ -27,9 +27,10 @@ interface User {
 interface DashboardProps {
   user: User;
   onLogout: () => void;
+  onViewProfile: () => void;
 }
 
-const Dashboard = ({ user, onLogout }: DashboardProps) => {
+const Dashboard = ({ user, onLogout, onViewProfile }: DashboardProps) => {
   const [profile, setProfile] = useState<User | null>(user);
   const [loading, setLoading] = useState(false);
 
@@ -137,8 +138,8 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
                   >
                     Refresh Profile
                   </Button>
-                  <Button variant="outline" isDisabled>
-                    Edit Profile (Coming Soon)
+                  <Button variant="outline" colorScheme="blue" onClick={onViewProfile}>
+                    My Profile
                   </Button>
                 </HStack>
               </CardBody>

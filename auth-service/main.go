@@ -134,7 +134,7 @@ func main() {
 
 	// Add CORS middleware for frontend usage
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*", // Common Vite dev server ports
+		AllowOrigins:     "http://localhost:3000, http://127.0.0.1:3000", // <-- set your frontend origin(s) here
 		AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -237,8 +237,9 @@ func (db *DatabaseService) createUser(userReq *UserRequest) (*User, error) {
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
+	err = bcrypt.CompareHashAndPassword([]byte(userReq.Password), []byte(hashedPassword))
 	if err != nil {
-		return nil, fmt.Errorf("error hashing password: %w", err)
+		return nil, fmt.Errorf("invalid credentials")
 	}
 
 	// Create user

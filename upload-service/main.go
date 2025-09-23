@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +28,34 @@ func waitForPortRelease(port string, timeout time.Duration) error {
 		time.Sleep(300 * time.Millisecond)
 	}
 	return fmt.Errorf("port %s did not free up in time", port)
+}
+
+func chunkVideo(inputPath string) error {
+	// Output directory based on the file name (no extension)
+	base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
+	outDir := filepath.Join("uploads", base+"_hls")
+
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return err
+	}
+
+	// FFmpeg command:
+	// - hls_time 10 : 10s segments
+	// - hls_playlist_type vod : full playlist (not live)
+	cmd := exec.Command("ffmpeg",
+		"-i", inputPath,
+		"-profile:v", "baseline",
+		"-level", "3.0",
+		"-start_number", "0",
+		"-hls_time", "10",
+		"-hls_list_size", "0",
+		"-f", "hls",
+		filepath.Join(outDir, "index.m3u8"),
+	)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func main() {
@@ -77,10 +106,22 @@ func main() {
 		if err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, "No video file uploaded")
 		}
+
 		savePath := filepath.Join(uploadDir, file.Filename)
 		if err := c.SaveFile(file, savePath); err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, "Failed to save video")
 		}
+
+		// Start FFmpeg in a separate goroutine (non-blocking)
+		go func() {
+			fmt.Println("Starting FFmpeg chunking for:", savePath)
+			if err := chunkVideo(savePath); err != nil {
+				log.Printf("FFmpeg error for %s: %v\n", savePath, err)
+			} else {
+				log.Printf("Chunking completed for %s\n", savePath)
+			}
+		}()
+
 		return c.JSON(fiber.Map{
 			"message": "Video uploaded successfully",
 			"path":    "/uploads/" + file.Filename,

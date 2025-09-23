@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"runtime"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -16,18 +15,12 @@ import (
 
 var serviceProcs []*os.Process
 
+// killPort attempts to free a given TCP port across platforms
 func killPort(port string) {
-<<<<<<< HEAD
-    switch runtime.GOOS {
-    case "windows":
-        // PowerShell script to kill a process only if it exists
-        psCmd := `
-=======
 	switch runtime.GOOS {
 	case "windows":
 		// PowerShell script to kill a process only if it exists
 		psCmd := `
->>>>>>> e10efc4 (some changes)
         $conn = Get-NetTCPConnection -LocalPort ` + port + ` -ErrorAction SilentlyContinue
         if ($conn) {
             $pid = $conn.OwningProcess
@@ -40,28 +33,6 @@ func killPort(port string) {
         } else {
             Write-Output "No process found on port ` + port + `"
         }`
-
-<<<<<<< HEAD
-        cmd := exec.Command("powershell", "-Command", psCmd)
-        out, err := cmd.CombinedOutput()
-        if err != nil {
-            log.Printf("Error checking/killing port %s: %v", port, err)
-        }
-        log.Printf("%s", strings.TrimSpace(string(out)))
-
-    default: // Linux/macOS
-        out, err := exec.Command("lsof", "-ti", "tcp:"+port).Output()
-        if err != nil {
-            log.Printf("No process found on port %s or lsof error: %v", port, err)
-            return
-        }
-        pids := strings.Fields(string(out))
-        for _, pid := range pids {
-            exec.Command("kill", "-9", pid).Run()
-            log.Printf("Killed process %s on port %s", pid, port)
-        }
-    }
-=======
 		cmd := exec.Command("powershell", "-Command", psCmd)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -81,9 +52,9 @@ func killPort(port string) {
 			log.Printf("Killed process %s on port %s", pid, port)
 		}
 	}
->>>>>>> e10efc4 (some changes)
 }
 
+// startService runs a Go service in a specified directory
 func startService(name, dir string) {
 	cmd := exec.Command("go", "run", "main.go")
 	cmd.Dir = dir
@@ -98,17 +69,16 @@ func startService(name, dir string) {
 
 func main() {
 	// Kill processes on ports that might cause trouble
-	killPort("3000") // Add more ports if needed
+	killPort("3000") // Kill anything on port 3000
+	killPort("3001") // Kill anything on port 3001 if needed
 
 	services := map[string]string{
 		"auth-service":   "./auth-service",
 		"upload-service": "./upload-service",
-		// "social-service":   "./social-service",
-		// "search-service":   "./search-service",
-		// "playback-service": "./playback-service",
+		// Add more services here if needed
 	}
 
-	// Handle SIGINT and SIGTERM
+	// Handle termination signals to clean up child processes
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -123,15 +93,17 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Start each service
 	for name, dir := range services {
 		startService(name, dir)
 	}
 
+	// Main Fiber app (just a simple control endpoint)
 	app := fiber.New()
 
 	// Enable CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000, http://127.0.0.1:3000", // Common Vite dev server ports
+		AllowOrigins:     "http://localhost:3000,http://127.0.0.1:3000", // Allowed origins
 		AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -140,6 +112,13 @@ func main() {
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Welcome to StreamFlow!")
 	})
+
+	// Start a small HTTP server on a management port (optional)
+	go func() {
+		if err := app.Listen(":4000"); err != nil {
+			log.Fatalf("Failed to start management server: %v", err)
+		}
+	}()
 
 	// Prevent main from exiting
 	select {}

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -16,10 +17,17 @@ import (
 var serviceProcs []*os.Process
 
 func killPort(port string) {
+<<<<<<< HEAD
     switch runtime.GOOS {
     case "windows":
         // PowerShell script to kill a process only if it exists
         psCmd := `
+=======
+	switch runtime.GOOS {
+	case "windows":
+		// PowerShell script to kill a process only if it exists
+		psCmd := `
+>>>>>>> e10efc4 (some changes)
         $conn = Get-NetTCPConnection -LocalPort ` + port + ` -ErrorAction SilentlyContinue
         if ($conn) {
             $pid = $conn.OwningProcess
@@ -33,6 +41,7 @@ func killPort(port string) {
             Write-Output "No process found on port ` + port + `"
         }`
 
+<<<<<<< HEAD
         cmd := exec.Command("powershell", "-Command", psCmd)
         out, err := cmd.CombinedOutput()
         if err != nil {
@@ -52,6 +61,27 @@ func killPort(port string) {
             log.Printf("Killed process %s on port %s", pid, port)
         }
     }
+=======
+		cmd := exec.Command("powershell", "-Command", psCmd)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Error checking/killing port %s: %v", port, err)
+		}
+		log.Printf("%s", strings.TrimSpace(string(out)))
+
+	default: // Linux/macOS
+		out, err := exec.Command("lsof", "-ti", "tcp:"+port).Output()
+		if err != nil {
+			log.Printf("No process found on port %s or lsof error: %v", port, err)
+			return
+		}
+		pids := strings.Fields(string(out))
+		for _, pid := range pids {
+			exec.Command("kill", "-9", pid).Run()
+			log.Printf("Killed process %s on port %s", pid, port)
+		}
+	}
+>>>>>>> e10efc4 (some changes)
 }
 
 func startService(name, dir string) {

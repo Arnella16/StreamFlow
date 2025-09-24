@@ -28,9 +28,10 @@ interface DashboardProps {
   user: User;
   onLogout: () => void;
   onViewProfile: () => void;
+  onGoToUpload: () => void;
 }
 
-const Dashboard = ({ user, onLogout, onViewProfile }: DashboardProps) => {
+const Dashboard = ({ user, onLogout, onViewProfile, onGoToUpload }: DashboardProps) => {
   const [profile, setProfile] = useState<User | null>(user);
   const [loading, setLoading] = useState(false);
 
@@ -140,6 +141,10 @@ const Dashboard = ({ user, onLogout, onViewProfile }: DashboardProps) => {
                   </Button>
                   <Button variant="outline" colorScheme="blue" onClick={onViewProfile}>
                     My Profile
+                  </Button>
+
+                  <Button variant="outline" colorScheme="blue" onClick={onGoToUpload}>
+                    Upload New Content
                   </Button>
                 </HStack>
               </CardBody>

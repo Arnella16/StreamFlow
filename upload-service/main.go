@@ -52,7 +52,7 @@ func main() {
 
 	// CORS with explicit origin (safe for credentials)
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:" + port,
+		AllowOrigins:     "http://localhost:5173,http://localhost:3000,http://localhost:3001",
 		AllowMethods:     "GET,POST,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,

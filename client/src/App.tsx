@@ -4,9 +4,10 @@ import UserRegistrationForm from './components/UserRegistrationForm';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
+import UploadPage from './components/UploadPage';
 import Navbar from './components/Navbar';
 
-type AuthMode = 'login' | 'register' | 'dashboard' | 'profile';
+type AuthMode = 'login' | 'register' | 'dashboard' | 'profile' | 'upload';
 
 interface User {
   _id: string;
@@ -80,6 +81,7 @@ function App() {
             user={user}
             onLogout={handleLogout}
             onViewProfile={handleViewProfile}
+            onGoToUpload={() => setAuthMode('upload')}
           />
         ) : null;
       case 'profile':
@@ -89,6 +91,13 @@ function App() {
           onGoBack={() => setAuthMode('dashboard')}
         />
       ) : null;
+      case 'upload':
+        return user ? (
+          <UploadPage
+            user={user}
+            onGoBack={() => setAuthMode('dashboard')}
+          />
+        ) : null;
       default:
         return null;
     }

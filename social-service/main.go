@@ -18,6 +18,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	log.Println("Social service running on port 5000")
-	app.Listen(":5000")
+	log.Println("Social service running on port 3002")
+	app.Listen(":3002")
+
 }

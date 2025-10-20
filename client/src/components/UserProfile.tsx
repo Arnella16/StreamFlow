@@ -48,7 +48,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
   },
   ]);
 
-  const [likedVideos, setLikedVideos] = useState<LikedVideo[]>([
+  const [likedVideos] = useState<LikedVideo[]>([
     {
       id: "101",
       title: "Funny Cat Video",

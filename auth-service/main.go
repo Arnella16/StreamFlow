@@ -134,7 +134,7 @@ func main() {
 
 	// Add CORS middleware for frontend usage
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173", // <-- set your frontend origin(s) here
+		AllowOrigins:     "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://127.0.0.1:8081", // <-- set your frontend origin(s) here
 		AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -240,7 +240,6 @@ func (db *DatabaseService) createUser(userReq *UserRequest) (*User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error hashing password: %w", err)
 	}
-
 
 	// Create user
 	user := &User{

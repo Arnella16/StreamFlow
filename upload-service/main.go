@@ -16,7 +16,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-// check if port is free
+// waitForPortRelease ensures the port is free before listening
 func waitForPortRelease(port string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -30,8 +30,8 @@ func waitForPortRelease(port string, timeout time.Duration) error {
 	return fmt.Errorf("port %s did not free up in time", port)
 }
 
+// chunkVideo uses FFmpeg to split uploaded video into HLS segments
 func chunkVideo(inputPath string) error {
-	// Output directory based on the file name (no extension)
 	base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
 	outDir := filepath.Join("uploads", base+"_hls")
 
@@ -39,9 +39,6 @@ func chunkVideo(inputPath string) error {
 		return err
 	}
 
-	// FFmpeg command:
-	// - hls_time 10 : 10s segments
-	// - hls_playlist_type vod : full playlist (not live)
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
 		"-profile:v", "baseline",
@@ -59,29 +56,21 @@ func chunkVideo(inputPath string) error {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3001"
-	}
+	port := "3001"
 
-	// ---------- CLEAN PORT BEFORE START ----------
+	// Clean any process using this port
 	fmt.Printf("Cleaning any process using port %s...\n", port)
-	kill := exec.Command("fuser", "-k", port+"/tcp")
-	kill.Stdout = os.Stdout
-	kill.Stderr = os.Stderr
-	_ = kill.Run() // ignore error if nothing is running
+	_ = exec.Command("fuser", "-k", port+"/tcp").Run()
 
-	// Wait for the port to actually release
 	if err := waitForPortRelease(port, 3*time.Second); err != nil {
 		log.Fatalf("Port %s is still busy: %v", port, err)
 	}
 
-	// ---------- FIBER APP ----------
 	app := fiber.New()
 
-	// CORS with explicit origin (safe for credentials)
+	// Enable CORS for your frontend (5173 for Vite, etc.)
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173,http://localhost:3000,http://localhost:3001",
+		AllowOrigins:     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
 		AllowMethods:     "GET,POST,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -89,19 +78,17 @@ func main() {
 
 	uploadDir := "./uploads"
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	// ---------- ROUTES ----------
-	app.Get("/upload", func(c *fiber.Ctx) error {
-		return c.SendFile("./public/index.html")
-	})
+	// ----------- ROUTES -----------
 
-	app.Options("/upload", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusNoContent)
-	})
+	// Serve static files
+	app.Static("/uploads", "./uploads")
+	app.Static("/static", "./public")
 
-	app.Post("/upload", func(c *fiber.Ctx) error {
+	// Upload directly to root (POST /)
+	app.Post("/", func(c *fiber.Ctx) error {
 		file, err := c.FormFile("video")
 		if err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, "No video file uploaded")
@@ -112,7 +99,7 @@ func main() {
 			return fiber.NewError(fiber.StatusInternalServerError, "Failed to save video")
 		}
 
-		// Start FFmpeg in a separate goroutine (non-blocking)
+		// Run FFmpeg chunking asynchronously
 		go func() {
 			fmt.Println("Starting FFmpeg chunking for:", savePath)
 			if err := chunkVideo(savePath); err != nil {
@@ -128,28 +115,26 @@ func main() {
 		})
 	})
 
-	app.Static("/static", "./public")
-	app.Static("/uploads", "./uploads")
-
+	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
+	// Fallback route
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(404).SendString("Not Found")
 	})
 
-	// ---------- GRACEFUL SHUTDOWN ----------
+	// Graceful shutdown
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
 		fmt.Println("\nShutting down upload service...")
-		app.Shutdown()
+		_ = app.Shutdown()
 	}()
 
-	// ---------- START SERVER ----------
-	fmt.Printf("Upload service running at http://localhost:%s\n", port)
+	fmt.Printf("🚀 Upload service running at http://localhost:%s\n", port)
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

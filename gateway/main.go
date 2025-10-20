@@ -25,7 +25,7 @@ func main() {
 	// --------------------------
 	// Serve React frontend (Vite build)
 	// --------------------------
-	frontendDir := "../client/dist"
+	frontendDir := "./client/dist"
 	app.Static("/", frontendDir)
 
 	// Fallback for React Router
@@ -52,7 +52,7 @@ func main() {
 	// --------------------------
 	// API Proxy routes
 	// --------------------------
-	app.All("/auth/api/*", forward("/auth/api", "http://127.0.0.1:3000"))
+	app.All("/auth/api/*", forward("/auth/api", "http://127.0.0.1:3000/api/auth"))
 	app.All("/upload/api/*", forward("/upload/api", "http://127.0.0.1:3001"))
 	app.All("/social/api/*", forward("/social/api", "http://127.0.0.1:3002"))
 

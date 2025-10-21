@@ -6,8 +6,9 @@ import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import UploadPage from './components/UploadPage';
 import Navbar from './components/Navbar';
+import PlaybackPage from './components/PlaybackPage/PlaybackPage';
 
-type AuthMode = 'login' | 'register' | 'dashboard' | 'profile' | 'upload';
+type AuthMode = 'login' | 'register' | 'dashboard' | 'profile' | 'upload' | 'playback';
 
 interface User {
   _id: string;
@@ -82,6 +83,7 @@ function App() {
             onLogout={handleLogout}
             onViewProfile={handleViewProfile}
             onGoToUpload={() => setAuthMode('upload')}
+            onWatchVideos={() => setAuthMode('playback')}
           />
         ) : null;
       case 'profile':
@@ -94,6 +96,14 @@ function App() {
       case 'upload':
         return user ? (
           <UploadPage
+            user={user}
+            onGoBack={() => setAuthMode('dashboard')}
+          />
+        ) : null;
+
+      case 'playback':
+        return user ? (
+          <PlaybackPage
             user={user}
             onGoBack={() => setAuthMode('dashboard')}
           />

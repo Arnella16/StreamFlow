@@ -1,0 +1,49 @@
+STEP 1 -> Start the elastic search docker container
+
+first, open Desktop Docker
+
+docker run -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+
+wait for some time until spam stops and then go to step 2
+
+
+
+STEP 2 -> Start the go-search-service
+
+Navigate to the go-search-service folder
+and then run the command
+go run main.go
+
+
+
+STEP 3 -> Try out some queries
+
+Go to Postman
+There is alr a collection of different requests needed to simulate
+
+PASTE THIS IN ADD MULTIPLE INDICES
+http://localhost:8080/bulk
+
+{ "index" : { "_index" : "videos", "_id" : "vid001" } }
+{ "id": "vid001", "title": "Funny Cat Moments", "description": "A hilarious compilation of cat and kitten videos.", "author": "Viral Pets" }
+{ "index" : { "_index" : "videos", "_id" : "vid002" } }
+{ "id": "vid002", "title": "Training Your Dog: The Basics", "description": "A simple guide for new dog owners.", "author": "Pro Trainer" }
+{ "index" : { "_index" : "videos", "_id" : "vid003" } }
+{ "id": "vid003", "title": "The Art of Baking Bread", "description": "Learn to bake artisanal bread at home.", "author": "Le Chef" }
+{ "index" : { "_index" : "videos", "_id" : "vid004" } }
+{ "id": "vid004", "title": "Advanced Go Programming", "description": "Exploring concurrency and channels in Golang.", "author": "Go Gurus" }
+{ "index" : { "_index" : "videos", "_id" : "vid005" } }
+{ "id": "vid005", "title": "Understanding Your Pet Cat's Behavior", "description": "A deep dive into the psychology of the modern house cat.", "author": "Pet Insights" }
+{ "index" : { "_index" : "videos", "_id" : "vid006" } }
+{ "id": "vid006", "title": "Baking the Perfect Birthday Cake", "description": "A step-by-step recipe for a delicious layer cake.", "author": "Sweet Treats" }
+{ "index" : { "_index" : "videos", "_id" : "vid007" } }
+{ "id": "vid007", "title": "Puppy's First Adventure", "description": "A cute video following a young dog on its first trip to the park.", "author": "Dog Days" }
+{ "index" : { "_index" : "videos", "_id" : "vid008" } }
+{ "id": "vid008", "title": "Elasticsearch Tutorial for Developers", "description": "A guide to integrating the search engine into your app.", "author": "Dev Guides" }
+{ "index" : { "_index" : "videos", "_id" : "vid009" } }
+{ "id": "vid009", "title": "History of the Internet", "description": "A documentary about the creation of the web and search engines.", "author": "Tech History" }
+{ "index" : { "_index" : "videos", "_id" : "vid010" } }
+{ "id": "vid010", "title": "Healthy Dog Food Recipes", "description": "Learn to make nutritious and tasty food for your dog.", "author": "Pawsitive Vids" }
+
+
+REST FIGURE IT OUT

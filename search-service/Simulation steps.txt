@@ -21,9 +21,14 @@ STEP 3 -> Try out some queries
 Go to Postman
 There is alr a collection of different requests needed to simulate
 
-PASTE THIS IN ADD MULTIPLE INDICES
+First add data to our elastic search container
+
+To add data in bulk, make a post request to the following endpoint:
 http://localhost:8080/bulk
 
+add whichever data u want in the body
+
+eg. add the below text as json body in the post request
 { "index" : { "_index" : "videos", "_id" : "vid001" } }
 { "id": "vid001", "title": "Funny Cat Moments", "description": "A hilarious compilation of cat and kitten videos.", "author": "Viral Pets" }
 { "index" : { "_index" : "videos", "_id" : "vid002" } }
@@ -45,5 +50,6 @@ http://localhost:8080/bulk
 { "index" : { "_index" : "videos", "_id" : "vid010" } }
 { "id": "vid010", "title": "Healthy Dog Food Recipes", "description": "Learn to make nutritious and tasty food for your dog.", "author": "Pawsitive Vids" }
 
-
-REST FIGURE IT OUT
+Next, we have multiple endpoints for searching
+eg.
+Sentence search -> GET request to http://localhost:8080/sentence-search?q=cook tasty bread or cake

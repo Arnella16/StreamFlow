@@ -23,7 +23,10 @@ type Video struct {
 
 var es *elasticsearch.Client
 
+
+
 const indexName = "videos"
+
 
 func main() {
 	var err error

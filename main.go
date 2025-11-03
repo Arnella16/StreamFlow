@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -39,23 +42,47 @@ func killPort(port string) {
 			return
 		}
 		for _, pid := range strings.Fields(string(out)) {
-			exec.Command("kill", "-9", pid).Run()
+			_ = exec.Command("kill", "-9", pid).Run()
 			log.Printf("Killed process %s on port %s", pid, port)
 		}
 	}
 }
 
-// Start a microservice
-func startService(name, dir string) {
+// waitForTCP polls an address until it accepts TCP connections or times out
+func waitForTCP(addr string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return nil
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for %s", addr)
+}
+
+// Start a microservice (name = for logs, dir = working dir, addr = host:port to wait for)
+func startService(name, dir, addr string) {
 	cmd := exec.Command("go", "run", "main.go")
 	cmd.Dir = dir
 	cmd.Stdout = log.Writer()
 	cmd.Stderr = log.Writer()
+
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Failed to start %s: %v", name, err)
 	}
 	serviceProcs = append(serviceProcs, cmd.Process)
 	log.Printf("%s started (PID %d)", name, cmd.Process.Pid)
+
+	// wait for service to accept TCP connections (non-fatal)
+	if addr != "" {
+		if err := waitForTCP(addr, 10*time.Second); err != nil {
+			log.Printf("Warning: %s may not be ready at %s: %v", name, addr, err)
+		} else {
+			log.Printf("✅ %s is listening at %s", name, addr)
+		}
+	}
 }
 
 func main() {
@@ -65,12 +92,16 @@ func main() {
 	killPort("3002")
 	killPort("8081") // gateway port
 
-	// Microservices to start
-	services := map[string]string{
-		"auth-service":     "./auth-service",
-		"upload-service":   "./upload-service",
-		"social-service":   "./social-service",
-		"playback-service": "./playback-service",
+	// Microservices to start (name, directory, host:port to wait for)
+	services := []struct {
+		name string
+		dir  string
+		addr string
+	}{
+		{"auth-service", "./auth-service", "127.0.0.1:3000"},
+		{"upload-service", "./upload-service", "127.0.0.1:3001"},
+		{"social-service", "./social-service", "127.0.0.1:3002"},
+		{"playback-service", "./playback-service", "127.0.0.1:8080"},
 	}
 
 	// Graceful shutdown of microservices
@@ -81,16 +112,16 @@ func main() {
 		log.Println("Shutting down services...")
 		for _, proc := range serviceProcs {
 			if proc != nil {
-				proc.Kill()
+				_ = proc.Kill()
 				log.Printf("Killed service PID %d", proc.Pid)
 			}
 		}
 		os.Exit(0)
 	}()
 
-	// Start all microservices
-	for name, dir := range services {
-		startService(name, dir)
+	// Start all microservices (only once)
+	for _, s := range services {
+		startService(s.name, s.dir, s.addr)
 	}
 
 	// --------------------------
@@ -100,7 +131,7 @@ func main() {
 
 	// CORS for frontend
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://127.0.0.1:8081, http://localhost:5173",
+		AllowOrigins:     "http://127.0.0.1:8081,http://localhost:5173",
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -110,7 +141,7 @@ func main() {
 	frontendDir := "./client/dist"
 	app.Static("/", frontendDir)
 
-	// Fallback for React Router
+	// Fallback for React Router — allow API proxy prefixes through
 	app.Use(func(c *fiber.Ctx) error {
 		path := c.Path()
 		if strings.HasPrefix(path, "/auth/api") ||
@@ -137,3 +168,4 @@ func main() {
 	log.Println("Gateway running at http://127.0.0.1:8081")
 	log.Fatal(app.Listen(":8081"))
 }
+

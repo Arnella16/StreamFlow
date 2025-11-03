@@ -97,7 +97,7 @@ func main() {
 		return c.SendStatus(204)
 	})
 
-	port := 8080
+	port := 8083
 	fmt.Printf("🚀 Server running at http://localhost:%d\n", port)
 	log.Fatal(app.Listen(fmt.Sprintf(":%d", port)))
 }

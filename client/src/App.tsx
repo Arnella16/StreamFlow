@@ -7,8 +7,9 @@ import UserProfile from './components/UserProfile';
 import UploadPage from './components/UploadPage';
 import Navbar from './components/Navbar';
 import SearchPage from './components/SearchPage/SearchPage';
+import PlaybackPage from './components/PlaybackPage';
 
-type AuthMode = 'login' | 'register' | 'dashboard' | 'profile' | 'upload' | 'search';
+type AuthMode = 'login' | 'register' | 'dashboard' | 'profile' | 'upload' | 'search' | 'playback';
 
 interface User {
   _id: string;
@@ -21,6 +22,7 @@ interface User {
 function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [user, setUser] = useState<User | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const bg = useColorModeValue("gray.100", "gray.900");
 
   // Check if user is already logged in on app start
@@ -106,8 +108,22 @@ function App() {
           <SearchPage
             user={user}
             onGoBack={() => setAuthMode('dashboard')}
+            onVideoSelect={(video) => {
+              setSelectedVideo(video);
+              setAuthMode('playback');
+            }}
           />
         ) : null;
+
+      case 'playback':
+        return selectedVideo ? (
+          <PlaybackPage
+            video={selectedVideo}
+            onGoBack={() => setAuthMode('search')}
+            onGoDashboard={() => setAuthMode('dashboard')}
+          />
+        ) : null;
+
       default:
         return null;
     }

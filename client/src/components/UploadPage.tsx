@@ -60,7 +60,7 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
     formData.append("video", selectedFile);
 
     try {
-      const res = await fetch("http://localhost:3001/upload", {
+      const res = await fetch("http://localhost:3001/", {
         method: "POST",
         body: formData,
       });

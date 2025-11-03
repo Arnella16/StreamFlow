@@ -25,74 +25,64 @@ interface Video {
   thumbnailUrl: string;
   likesCount: number;
   viewsCount: number;
+  comments?: string[];
 }
 
 interface LikedVideo extends Video {
   likedByUser: boolean;
-  userComment: string;
+  userComment?: string;
 }
 
 interface UserProfileProps {
-  user: User;          // required user
-  onGoBack: () => void;  // optional back function
+  user: User;
+  onGoBack: () => void;
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
-  const [videos, setVideos] = useState<Video[]>([
-    {
-    id: "1",
-    title: "Dummy Video",
-    thumbnailUrl: "https://via.placeholder.com/150",
-    likesCount: 10,
-    viewsCount: 100,
-  },
-  ]);
-
-  const [likedVideos] = useState<LikedVideo[]>([
-    {
-      id: "101",
-      title: "Funny Cat Video",
-      thumbnailUrl: "https://via.placeholder.com/150",
-      likesCount: 50,
-      viewsCount: 500,
-      likedByUser: true,          // dummy like
-      userComment: "So cute! 😻", // dummy comment
-    },
-    {
-      id: "102",
-      title: "Amazing Travel Vlog",
-      thumbnailUrl: "https://via.placeholder.com/150",
-      likesCount: 120,
-      viewsCount: 1000,
-      likedByUser: true,
-      userComment: "I want to go there! ✈️",
-    },
-  ]);
-
-
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [likedVideos, setLikedVideos] = useState<LikedVideo[]>([]);
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
 
   useEffect(() => {
-
-    // get user's uploaded videos (adjust URL to your API)
     const token = localStorage.getItem("auth_token");
-    if (token) {
-      fetch("http://localhost:5000/api/videos/my", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((data) => setVideos(data))
-        .catch((err) => console.error("Error fetching videos:", err));
-    }
-  }, []);
+    if (!token) return;
 
-  
+    // ✅ Fetch user's uploaded videos (your uploads)
+    fetch("http://localhost:3001/videos", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setVideos(data || []))
+      .catch((err) => console.error("Error fetching uploaded videos:", err));
+
+    // ✅ Fetch videos you liked or commented on (likes >= 1 or comments >= 1)
+    fetch("http://localhost:3002/videos", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data: any[]) => {
+        const likedOrCommented = data.filter(
+          (v) => (v.likes && v.likes >= 1) || (v.comments && v.comments.length >= 1)
+        );
+        const mapped = likedOrCommented.map((v) => ({
+          id: v.id,
+          title: v.title,
+          thumbnailUrl: v.thumbnail || "https://via.placeholder.com/150",
+          likesCount: v.likes || 0,
+          viewsCount: v.views || 0,
+          likedByUser: v.likes && v.likes > 0,
+          userComment: v.comments?.[0] || "",
+        }));
+        setLikedVideos(mapped);
+      })
+      .catch((err) => console.error("Error fetching liked/commented videos:", err));
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_info");
-    window.location.href = "/login"; // redirect to login
+    window.location.href = "/login";
   };
 
   if (!user) {
@@ -117,13 +107,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
           p={10}
         >
           <VStack gap={6} align="stretch">
-
-            <Button
-              onClick={onGoBack}
-              colorScheme="blue"
-              size="md"
-              alignSelf="flex-start"
-            >
+            <Button onClick={onGoBack} colorScheme="blue" size="md" alignSelf="flex-start">
               ← Go Back to Dashboard
             </Button>
 
@@ -142,8 +126,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
               </VStack>
             </Center>
 
+            {/* ✅ My Uploaded Videos */}
             <Heading size="md" mt={8}>
-              Your Uploaded Videos
+              My Uploaded Videos
             </Heading>
             {videos.length === 0 ? (
               <Text color={useColorModeValue("gray.600", "gray.400")}>
@@ -160,56 +145,76 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
                     boxShadow="sm"
                   >
                     <Image
-                      src={video.thumbnailUrl}
+                      src={video.thumbnailUrl || "https://via.placeholder.com/150"}
                       alt={video.title}
                       w="full"
                       h="150px"
                       objectFit="cover"
                     />
-                    <Box p={3}> 
-                        <Text fontWeight="semibold">{video.title}</Text> 
-                        <Text fontSize="sm" color="gray.500"> {video.likesCount} likes • {video.viewsCount} views </Text>
+                    <Box p={3}>
+                      <Text fontWeight="semibold">{video.title}</Text>
+                      <Text fontSize="sm" color="gray.500">
+                        {video.likesCount} likes • {video.viewsCount} views
+                      </Text>
                     </Box>
                   </Box>
                 ))}
               </SimpleGrid>
             )}
 
-            <Heading size="md" mt={12}>Videos You Liked / Commented On</Heading>
-
+            {/* ✅ Videos You Liked / Commented On */}
+            <Heading size="md" mt={12}>
+              Videos You Liked / Commented On
+            </Heading>
             {likedVideos.length === 0 ? (
-            <Text color={useColorModeValue("gray.600", "gray.400")}>
+              <Text color={useColorModeValue("gray.600", "gray.400")}>
                 You haven’t liked or commented on any videos yet.
-            </Text>
+              </Text>
             ) : (
-            <SimpleGrid columns={[1, 2, 3]} spacing={5} mt={2}>
+              <SimpleGrid columns={[1, 2, 3]} spacing={5} mt={2}>
                 {likedVideos.map((video) => (
-                <Box key={video.id} borderWidth="1px" borderRadius="md" overflow="hidden" boxShadow="sm">
+                  <Box
+                    key={video.id}
+                    borderWidth="1px"
+                    borderRadius="md"
+                    overflow="hidden"
+                    boxShadow="sm"
+                  >
                     <Image
-                    src={video.thumbnailUrl}
-                    alt={video.title}
-                    w="full"
-                    h="150px"
-                    objectFit="cover"
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      w="full"
+                      h="150px"
+                      objectFit="cover"
                     />
                     <Box p={3}>
-                    <Text fontWeight="semibold">{video.title}</Text>
-                    <Text fontSize="sm" color="gray.500">
+                      <Text fontWeight="semibold">{video.title}</Text>
+                      <Text fontSize="sm" color="gray.500">
                         {video.likesCount} likes • {video.viewsCount} views
-                    </Text>
+                      </Text>
 
-                    {/* Your like & comment on this video */}
-                    <Box mt={2} p={2} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
-                        <Text fontSize="sm" fontWeight="bold" mb={1}>Your Likes:</Text>
-                        <Text fontSize="sm">{video.likedByUser ? "Liked 👍" : "Not liked"}</Text>
+                      <Box
+                        mt={2}
+                        p={2}
+                        bg={useColorModeValue("gray.50", "gray.700")}
+                        borderRadius="md"
+                      >
+                        <Text fontSize="sm" fontWeight="bold" mb={1}>
+                          Your Likes:
+                        </Text>
+                        <Text fontSize="sm">
+                          {video.likedByUser ? "Liked 👍" : "Not liked"}
+                        </Text>
 
-                        <Text fontSize="sm" fontWeight="bold" mt={2} mb={1}>Your Comments:</Text>
+                        <Text fontSize="sm" fontWeight="bold" mt={2} mb={1}>
+                          Your Comments:
+                        </Text>
                         <Text fontSize="sm">{video.userComment || "No comment"}</Text>
+                      </Box>
                     </Box>
-                    </Box>
-                </Box>
+                  </Box>
                 ))}
-            </SimpleGrid>
+              </SimpleGrid>
             )}
 
             <Center>

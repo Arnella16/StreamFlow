@@ -14,6 +14,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/go-resty/resty/v2"
+
 )
 
 // waitForPortRelease ensures the port is free before listening
@@ -67,6 +69,8 @@ func main() {
 	}
 
 	app := fiber.New()
+	client := resty.New()
+
 
 	// Enable CORS for your frontend (5173 for Vite, etc.)
 	app.Use(cors.New(cors.Config{
@@ -99,6 +103,25 @@ func main() {
 			return fiber.NewError(fiber.StatusInternalServerError, "Failed to save video")
 		}
 
+		// Notify the socials service
+		resp, err := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(map[string]string{
+				"id":       file.Filename,
+				"title":    file.Filename,
+				"thumbnail": "https://picsum.photos/seed/" + file.Filename + "/640/360",
+				"path": "http://localhost:3001/uploads/" + file.Filename,
+			}).Post("http://localhost:3002/init")
+
+		if err != nil {
+			log.Println("⚠️ Failed to notify socials service:", err)
+		} else if resp.IsError() {
+			log.Println("⚠️ Socials service responded with error:", resp.String())
+		} else {
+			log.Println("✅ Social record created:", resp.String())
+		}
+
+
 		// Run FFmpeg chunking asynchronously
 		go func() {
 			fmt.Println("Starting FFmpeg chunking for:", savePath)
@@ -118,6 +141,32 @@ func main() {
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
+	// List uploaded videos
+	app.Get("/videos", func(c *fiber.Ctx) error {
+		files, err := os.ReadDir("./uploads")
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Cannot read uploads folder")
+		}
+
+		var videos []map[string]string
+		for _, f := range files {
+			if !f.IsDir() {
+				name := f.Name()
+				// Only include mp4, mov, etc.
+				if strings.HasSuffix(name, ".mp4") || strings.HasSuffix(name, ".mov") {
+					videos = append(videos, map[string]string{
+						"id":        name,
+						"title":     name,
+						"thumbnail": "https://picsum.photos/seed/" + name + "/640/360",
+						"src":       "http://localhost:3001/uploads/" + name,
+					})
+				}
+			}
+		}
+
+		return c.JSON(videos)
 	})
 
 	// Fallback route

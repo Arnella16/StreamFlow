@@ -1,166 +1,180 @@
 import React, { useRef, useEffect, useState } from "react";
 import {
   Box,
-  Container,
-  Heading,
-  SimpleGrid,
-  Image,
-  Text,
-  AspectRatio,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalBody,
-  ModalCloseButton,
-  useColorModeValue,
   Button,
+  AspectRatio,
+  Text,
   VStack,
+  Divider,
+  useColorModeValue,
+  Heading,
+  Input,
 } from "@chakra-ui/react";
+import { ArrowLeft } from "lucide-react";
 
-type Video = {
-  id: string;
-  title: string;
-  thumbnail: string;
-  src: string;
-  channel?: string;
-  views?: string;
-  duration?: string;
-};
+interface PlaybackPageProps {
+  video: {
+    id: string;
+    title: string;
+    src: string;
+    thumbnail: string;
+    channel?: string;
+    views?: string;
+  };
+  onGoBack?: () => void;
+  onGoDashboard?: () => void;
+}
 
-// sample videos (replace with DB data later)
-const SAMPLE_VIDEOS: Video[] = [
-  {
-    id: "1",
-    title: "Big Buck Bunny — Sample",
-    thumbnail: "https://picsum.photos/seed/1/640/360",
-    src: "https://www.w3schools.com/html/mov_bbb.mp4",
-    channel: "Sample Channel",
-    views: "1.2M",
-    duration: "10:34",
-  },
-  {
-    id: "2",
-    title: "Sample Clip 2",
-    thumbnail: "https://picsum.photos/seed/2/640/360",
-    src: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-    channel: "Demo Channel",
-    views: "856K",
-    duration: "02:12",
-  },
-  {
-    id: "3",
-    title: "Sample Clip 3",
-    thumbnail: "https://picsum.photos/seed/3/640/360",
-    src: "https://www.w3schools.com/html/mov_bbb.mp4",
-    channel: "Demo Channel",
-    views: "623K",
-    duration: "08:40",
-  },
-  {
-    id: "4",
-    title: "Sample Clip 4",
-    thumbnail: "https://picsum.photos/seed/4/640/360",
-    src: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-    channel: "Demo Channel",
-    views: "945K",
-    duration: "05:20",
-  },
-];
-
-const PlaybackPage: React.FC = () => {
-  const [videos] = useState<Video[]>(SAMPLE_VIDEOS);
-  const [selected, setSelected] = useState<Video | null>(null);
+const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashboard }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const bg = useColorModeValue("gray.50", "gray.900");
-  const cardBg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("gray.200", "gray.700");
+  const [likes, setLikes] = useState<number>(0);
+  const [comments, setComments] = useState<string[]>([]);
+  const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
-    // when modal opens try to play
-    if (selected && videoRef.current) {
-      // attempt to play (click was user gesture)
+    fetch(`http://localhost:3002/video/${video.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.likes !== undefined) setLikes(data.likes);
+        if (data.comments) setComments(data.comments);
+      })
+      .catch(() => {});
+  }, [video]);
+
+  useEffect(() => {
+    if (videoRef.current) {
       videoRef.current.currentTime = 0;
       const p = videoRef.current.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
-    } else {
-      // pause when closed
-      videoRef.current?.pause();
     }
-  }, [selected]);
+  }, [video]);
+
+  const handleLike = () => {
+    fetch(`http://localhost:3002/videos/${video.title}/like`, { method: "POST" })
+      .then(() => setLikes((prev) => prev + 1))
+      .catch(() => {});
+  };
+
+  const handleComment = () => {
+    if (!newComment.trim()) return;
+    fetch(`http://localhost:3002/videos/${video.title}/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: newComment }),
+    })
+      .then(() => {
+        setComments((prev) => [...prev, newComment]);
+        setNewComment("");
+      })
+      .catch(() => {});
+  };
 
   return (
-    <Box minH="100vh" bg={bg} pb={8}>
-      <Container maxW="7xl" pt={6}>
-        <Heading mb={6}>Playback — Click to Play</Heading>
+    <Box minH="100vh" bg="black" color="white" px={4} py={6}>
+      {/* Top bar with buttons */}
+      <Box display="flex" justifyContent="space-between" mb={4}>
+        <Button onClick={onGoBack} colorScheme="blue" size="sm">
+          ⬅ Back
+        </Button>
 
-        <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={6}>
-          {videos.map((v) => (
-            <Box
-              key={v.id}
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={border}
-              borderRadius="md"
-              overflow="hidden"
-              cursor="pointer"
-              boxShadow="md"
-              onClick={() => setSelected(v)}
-              transition="transform 0.15s ease"
-              _hover={{ transform: "translateY(-4px)" }}
+        {onGoDashboard && (
+          <Button onClick={onGoDashboard} colorScheme="green" size="sm">
+            🏠 Back to Dashboard
+          </Button>
+        )}
+      </Box>
+
+      {/* Split Layout */}
+      <Box display="flex" gap={6}>
+        {/* Left: Video Section */}
+        <Box flex="3">
+          <AspectRatio ratio={16 / 9} bg="black" mb={4}>
+            <video
+              ref={videoRef}
+              src={video.src}
+              controls
+              style={{ width: "100%", height: "100%", backgroundColor: "black" }}
+            />
+          </AspectRatio>
+
+          <Box>
+            <Text fontSize="2xl" fontWeight="bold">
+              {video.title}
+            </Text>
+            <Text fontSize="sm" color="gray.400">
+              {video.channel ?? "Uploaded by you"} • {video.views ?? "0"} views
+            </Text>
+          </Box>
+        </Box>
+
+        {/* Right: Likes & Comments Section */}
+        <Box flex="1" bg="gray.900" p={4} borderRadius="md">
+          {/* ✅ Added buttons ABOVE Likes & Comments */}
+          <Box display="flex" justifyContent="space-between" mb={4}>
+            <Button
+              onClick={onGoBack}
+              leftIcon={<ArrowLeft size={16} />}
+              variant="ghost"
+              size="sm"
+              colorScheme="blue"
             >
-              <AspectRatio ratio={16 / 9}>
-                <Image src={v.thumbnail} alt={v.title} objectFit="cover" />
-              </AspectRatio>
+              Back to Search
+            </Button>
 
-              <Box p={3}>
-                <Text fontWeight="semibold" noOfLines={2}>
-                  {v.title}
-                </Text>
-                <VStack spacing={0} align="start" mt={2}>
-                  <Text fontSize="sm" color="gray.500">
-                    {v.channel} • {v.views} views
-                  </Text>
-                </VStack>
-              </Box>
-            </Box>
-          ))}
-        </SimpleGrid>
-      </Container>
+            {onGoDashboard && (
+              <Button onClick={onGoDashboard} colorScheme="green" size="sm">
+                 Dashboard
+              </Button>
+            )}
+          </Box>
 
-      {/* Modal player */}
-      <Modal isOpen={Boolean(selected)} onClose={() => setSelected(null)} size="6xl" isCentered>
-        <ModalOverlay bg="blackAlpha.700" />
-        <ModalContent bg="transparent" boxShadow="none" maxW="90vw">
-          <ModalCloseButton color="white" zIndex={2} />
-          <ModalBody p={0} display="flex" justifyContent="center" alignItems="center">
-            <Box w={{ base: "100%", md: "80%" }} bg="black" borderRadius="md" overflow="hidden">
-              {/* video element */}
-              {selected && (
-                <AspectRatio ratio={16 / 9} bg="black">
-                  <video
-                    ref={videoRef}
-                    src={selected.src}
-                    controls
-                    style={{ width: "100%", height: "100%", backgroundColor: "black" }}
-                  />
-                </AspectRatio>
-              )}
+          {/* Existing Likes and Comments Section */}
+          <Heading size="md" mb={3}>
+            ❤️ Likes & 💬 Comments
+          </Heading>
 
-              {/* title & actions */}
-              {selected && (
-                <Box p={4} bg={useColorModeValue("white", "gray.800")}>
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {selected.title}
-                  </Text>
-                  <Text fontSize="sm" color="gray.500" mt={1}>
-                    {selected.channel} • {selected.views} views
-                  </Text>
+          <Box mb={3}>
+            <Text fontWeight="bold" mb={2}>
+              Likes: {likes}
+            </Text>
+            <Button colorScheme="pink" size="sm" onClick={handleLike}>
+              ❤️ Like
+            </Button>
+          </Box>
+
+          <Divider my={4} borderColor="gray.700" />
+
+          <VStack align="stretch" spacing={3}>
+            <Text fontWeight="bold">Comments:</Text>
+            {comments.length > 0 ? (
+              comments.map((c, idx) => (
+                <Box key={idx} p={2} bg="gray.800" borderRadius="md">
+                  {c}
                 </Box>
-              )}
+              ))
+            ) : (
+              <Text color="gray.500">No comments yet.</Text>
+            )}
+
+            <Divider borderColor="gray.700" />
+
+            <Box display="flex" gap={2}>
+              <Input
+                placeholder="Add a comment..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                bg="gray.800"
+                border="none"
+                color="white"
+                _placeholder={{ color: "gray.500" }}
+              />
+              <Button colorScheme="teal" size="sm" onClick={handleComment}>
+                💬 Post
+              </Button>
             </Box>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </VStack>
+        </Box>
+      </Box>
     </Box>
   );
 };

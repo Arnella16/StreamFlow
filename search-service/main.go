@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 type Video struct {
@@ -23,44 +23,41 @@ type Video struct {
 
 var es *elasticsearch.Client
 
-
-
 const indexName = "videos"
-
 
 func main() {
 	var err error
+
+	// ✅ Initialize Elasticsearch client
 	es, err = elasticsearch.NewDefaultClient()
 	if err != nil {
-		log.Fatalf("Error creating client: %s", err)
+		log.Fatalf("Error creating ES client: %s", err)
 	}
 
-	res, err := es.Info()
-	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
-	}
-	defer res.Body.Close()
-	log.Println(res)
+	// ✅ Fiber app
+	app := fiber.New()
 
-	http.HandleFunc("/create-indexes", createIndexesHandler)
-	http.HandleFunc("/create-index-with-mapping", createIndexWithMappingHandler)
-	http.HandleFunc("/index", indexHandler)
-	http.HandleFunc("/bulk", bulkIndexHandler)
-	http.HandleFunc("/exact-word-search", searchHandler)
-	http.HandleFunc("/fuzzy-search", fuzzySearchHandler)
-	http.HandleFunc("/sentence-search", sentenceSearchHandler)
+	// ✅ FIX CORS ERRORS HERE
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://127.0.0.1:8081, http://localhost:5173",
+		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowMethods: "GET, POST, OPTIONS",
+	}))
 
-	fmt.Println("Server is listening on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// ✅ ROUTES
+	app.Post("/create-indexes", createIndexesHandler)
+	app.Post("/create-index-with-mapping", createIndexWithMappingHandler)
+	app.Post("/index", indexHandler)
+	app.Post("/bulk", bulkIndexHandler)
+	app.Get("/exact-word-search", searchHandler)
+	app.Get("/fuzzy-search", fuzzySearchHandler)
+	app.Get("/sentence-search", sentenceSearchHandler)
+
+	fmt.Println("Fiber server listening on 8080...")
+	log.Fatal(app.Listen(":8080"))
 }
 
-// --- Create Index with mapping (better text analysis) ---
-func createIndexWithMappingHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func createIndexWithMappingHandler(c *fiber.Ctx) error {
 	mapping := `{
 	  "settings": {
 	    "analysis": {
@@ -74,137 +71,97 @@ func createIndexWithMappingHandler(w http.ResponseWriter, r *http.Request) {
 	  },
 	  "mappings": {
 	    "properties": {
-	      "title": {
-	        "type": "text",
-	        "analyzer": "english_text"
-	      },
-	      "description": {
-	        "type": "text",
-	        "analyzer": "english_text"
-	      },
-	      "author": {
-	        "type": "keyword"
-	      }
+	      "title": { "type": "text", "analyzer": "english_text" },
+	      "description": { "type": "text", "analyzer": "english_text" },
+	      "author": { "type": "keyword" }
 	    }
 	  }
 	}`
 
-	// Delete index if exists (for re-run safety)
+	// delete old index if exists
 	es.Indices.Delete([]string{indexName})
+
 	res, err := es.Indices.Create(indexName, es.Indices.Create.WithBody(strings.NewReader(mapping)))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error creating index: %s", err), http.StatusInternalServerError)
-		return
+		return c.Status(500).SendString("Error creating index: " + err.Error())
 	}
 	defer res.Body.Close()
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Index '%s' created with custom mapping.", indexName)
+
+	return c.SendString("Index created with mapping.")
 }
 
-// --- Create multiple indexes handler (unchanged) ---
 type CreateIndexesRequest struct {
 	Indexes []string `json:"indexes"`
 }
 
-func createIndexesHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
-		return
-	}
+func createIndexesHandler(c *fiber.Ctx) error {
 	var reqPayload CreateIndexesRequest
-	if err := json.NewDecoder(r.Body).Decode(&reqPayload); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&reqPayload); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid JSON"})
 	}
 
 	results := make(map[string]string)
+
 	for _, idx := range reqPayload.Indexes {
 		res, err := es.Indices.Create(idx)
 		if err != nil {
-			results[idx] = fmt.Sprintf("Error sending request: %s", err)
+			results[idx] = "Error: " + err.Error()
 			continue
 		}
 		defer res.Body.Close()
+
 		if res.IsError() {
-			results[idx] = fmt.Sprintf("Error: %s", res.String())
+			results[idx] = res.String()
 		} else {
 			results[idx] = "Created"
 		}
 	}
-	resp, _ := json.Marshal(results)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(resp)
+
+	return c.JSON(results)
 }
 
-// --- Bulk indexing (modified for analyzer index) ---
-func bulkIndexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading body", http.StatusInternalServerError)
-		return
-	}
+func bulkIndexHandler(c *fiber.Ctx) error {
+	body := c.Body()
+
 	res, err := es.Bulk(bytes.NewReader(body), es.Bulk.WithIndex(indexName))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error bulk indexing: %s", err), http.StatusInternalServerError)
-		return
+		return c.Status(500).SendString("Bulk error: " + err.Error())
 	}
 	defer res.Body.Close()
-	if res.IsError() {
-		http.Error(w, res.String(), http.StatusInternalServerError)
-		return
-	}
+
 	es.Indices.Refresh(es.Indices.Refresh.WithIndex(indexName))
-	fmt.Fprintln(w, "Bulk indexing done.")
+
+	return c.SendString("Bulk indexing done.")
 }
 
-// --- Single Index Handler ---
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func indexHandler(c *fiber.Ctx) error {
 	var video Video
-	if err := json.NewDecoder(r.Body).Decode(&video); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&video); err != nil {
+		return c.Status(400).SendString("Invalid JSON")
 	}
 
 	videoJSON, _ := json.Marshal(video)
+
 	req := esapi.IndexRequest{
 		Index:      indexName,
 		DocumentID: video.ID,
 		Body:       bytes.NewReader(videoJSON),
 		Refresh:    "true",
 	}
+
 	res, err := req.Do(context.Background(), es)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error indexing: %s", err), http.StatusInternalServerError)
-		return
+		return c.Status(500).SendString("Index error: " + err.Error())
 	}
 	defer res.Body.Close()
 
-	if res.IsError() {
-		http.Error(w, res.String(), http.StatusInternalServerError)
-	} else {
-		fmt.Fprintf(w, "Video indexed with ID %s\n", video.ID)
-	}
+	return c.SendString("Indexed video: " + video.ID)
 }
 
-// --- Sentence search (new full-text handler) ---
-func sentenceSearchHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	query := r.URL.Query().Get("q")
+func sentenceSearchHandler(c *fiber.Ctx) error {
+	query := c.Query("q")
 	if query == "" {
-		http.Error(w, "Missing ?q=", http.StatusBadRequest)
-		return
+		return c.Status(400).SendString("Missing q=")
 	}
 
 	queryBody := map[string]interface{}{
@@ -219,21 +176,13 @@ func sentenceSearchHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	var buf bytes.Buffer
-	json.NewEncoder(&buf).Encode(queryBody)
-	executeSearch(w, &buf)
+	return executeSearch(c, queryBody)
 }
 
-// --- Exact word search handler (unchanged) ---
-func searchHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	query := r.URL.Query().Get("q")
+func searchHandler(c *fiber.Ctx) error {
+	query := c.Query("q")
 	if query == "" {
-		http.Error(w, "Missing ?q=", http.StatusBadRequest)
-		return
+		return c.Status(400).SendString("Missing q=")
 	}
 
 	queryBody := map[string]interface{}{
@@ -243,68 +192,60 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	}
-	var buf bytes.Buffer
-	json.NewEncoder(&buf).Encode(queryBody)
-	executeSearch(w, &buf)
+
+	return executeSearch(c, queryBody)
 }
 
-// --- Fuzzy Search Handler (same) ---
-func fuzzySearchHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	query := r.URL.Query().Get("q")
+func fuzzySearchHandler(c *fiber.Ctx) error {
+	query := c.Query("q")
 	if query == "" {
-		http.Error(w, "Missing ?q=", http.StatusBadRequest)
-		return
+		return c.Status(400).SendString("Missing q=")
 	}
 
 	queryBody := map[string]interface{}{
 		"query": map[string]interface{}{
-			"fuzzy": map[string]interface{}{
-				"title": map[string]interface{}{
-					"value":     query,
-					"fuzziness": "AUTO",
-				},
+			"multi_match": map[string]interface{}{
+				"query":     query,
+				"fields":    []string{"title^3", "description"},
+				"fuzziness": "AUTO",
 			},
 		},
 	}
-	var buf bytes.Buffer
-	json.NewEncoder(&buf).Encode(queryBody)
-	executeSearch(w, &buf)
+
+	return executeSearch(c, queryBody)
 }
 
-// --- Common search executor ---
-func executeSearch(w http.ResponseWriter, queryBody io.Reader) {
+
+func executeSearch(c *fiber.Ctx, queryBody interface{}) error {
+	var buf bytes.Buffer
+	json.NewEncoder(&buf).Encode(queryBody)
+
 	res, err := es.Search(
-		es.Search.WithContext(context.Background()),
 		es.Search.WithIndex(indexName),
-		es.Search.WithBody(queryBody),
+		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
 	)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Search error: %s", err), http.StatusInternalServerError)
-		return
+		return c.Status(500).SendString("Search error: " + err.Error())
 	}
 	defer res.Body.Close()
 
-	if res.IsError() {
-		http.Error(w, res.String(), http.StatusInternalServerError)
-		return
-	}
-
 	var r map[string]interface{}
 	json.NewDecoder(res.Body).Decode(&r)
+
 	hits := r["hits"].(map[string]interface{})["hits"].([]interface{})
+
 	var videos []Video
+
 	for _, h := range hits {
 		src := h.(map[string]interface{})["_source"]
-		data, _ := json.Marshal(src)
+		b, _ := json.Marshal(src)
+
 		var v Video
-		json.Unmarshal(data, &v)
+		json.Unmarshal(b, &v)
 		videos = append(videos, v)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(videos)
+
+	return c.JSON(videos)
 }
+

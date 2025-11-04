@@ -136,7 +136,7 @@ func handleUpload(c *fiber.Ctx) error {
 	}
 
 	// Index into Elasticsearch
-	go indexVideoInES(file.Filename, file.Filename, "Uploaded video", "system")
+	go indexVideoInES(file.Filename, title, description, uploader)
 
 	// Chunk video
 	go func() {

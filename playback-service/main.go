@@ -15,10 +15,11 @@ func main() {
 	videoDir := "../upload-service/uploads/Screencast from 2025-09-13 01-00-32.webm_hls"
 
 
-    app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://localhost:8081",
-		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-		AllowHeaders: "Content-Type,Authorization",
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:5173, http://127.0.0.1:5173, http://localhost:8081",
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		ExposeHeaders:    "Content-Length",
 		AllowCredentials: true,
 	}))
 

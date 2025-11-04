@@ -166,18 +166,38 @@ func sentenceSearchHandler(c *fiber.Ctx) error {
 
 	queryBody := map[string]interface{}{
 		"query": map[string]interface{}{
-			"multi_match": map[string]interface{}{
-				"query":     query,
-				"fields":    []string{"title", "description"},
-				"type":      "best_fields",
-				"fuzziness": "AUTO",
-				"operator":  "or",
+			"bool": map[string]interface{}{
+				"should": []interface{}{
+					// ✅ Prefix search for autocomplete
+					map[string]interface{}{
+						"prefix": map[string]interface{}{
+							"title": query,
+						},
+					},
+					map[string]interface{}{
+						"prefix": map[string]interface{}{
+							"description": query,
+						},
+					},
+
+					// ✅ Fuzzy multi-field search (your original logic)
+					map[string]interface{}{
+						"multi_match": map[string]interface{}{
+							"query":     query,
+							"fields":    []string{"title", "description"},
+							"type":      "best_fields",
+							"fuzziness": "AUTO",
+							"operator":  "or",
+						},
+					},
+				},
 			},
 		},
 	}
 
 	return executeSearch(c, queryBody)
 }
+
 
 func searchHandler(c *fiber.Ctx) error {
 	query := c.Query("q")

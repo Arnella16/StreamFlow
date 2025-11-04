@@ -164,7 +164,10 @@ func main() {
 		log.Fatalf("Port %s is still busy: %v", port, err)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 1024 * 1024 * 1024, // 1 GB
+	})
+
 
 	// CORS
 	app.Use(cors.New(cors.Config{

@@ -31,7 +31,7 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
   const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
-    fetch(`http://localhost:3002/video/${video.id}`)
+    fetch(`http://localhost:8081/social/api/video/${video.title}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.likes !== undefined) setLikes(data.likes);
@@ -49,14 +49,14 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
   }, [video]);
 
   const handleLike = () => {
-    fetch(`http://localhost:3002/videos/${video.title}/like`, { method: "POST" })
+    fetch(`http://localhost:8081/social/api/videos/${video.title}/like`, { method: "POST" })
       .then(() => setLikes((prev) => prev + 1))
       .catch(() => {});
   };
 
   const handleComment = () => {
     if (!newComment.trim()) return;
-    fetch(`http://localhost:3002/videos/${video.title}/comment`, {
+    fetch(`http://localhost:8081/social/api/videos/${video.title}/comment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: newComment }),

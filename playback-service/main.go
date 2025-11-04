@@ -5,7 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
-
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -13,6 +13,17 @@ func main() {
 	app := fiber.New()
 
 	videoDir := "../upload-service/uploads/Screencast from 2025-09-13 01-00-32.webm_hls"
+
+
+    app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:8081",
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders: "Content-Type,Authorization",
+		AllowCredentials: true,
+	}))
+
+    
+
 
 	// Serve HLS files with logging
 	app.Get("/videos/*", func(c *fiber.Ctx) error {

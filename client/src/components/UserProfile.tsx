@@ -48,13 +48,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
 
-    // ✅ Fetch user's uploaded videos (your uploads)
+   // ✅ Fetch user's uploaded videos (your uploads)
     fetch("http://localhost:3001/videos", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((data) => setVideos(data || []))
+      .then((data: any[]) => {
+        const mapped = data.map((v) => ({
+          id: v._id || v.id,
+          title: v.title || "Untitled Video",
+          thumbnailUrl: v.thumbnail || "https://via.placeholder.com/150",
+          likesCount: v.likes || 0,
+          viewsCount: v.views || 0,
+          comments: v.comments || [],
+        }));
+        setVideos(mapped); // ✅ correct state updated here
+      })
       .catch((err) => console.error("Error fetching uploaded videos:", err));
+
 
     // ✅ Fetch videos you liked or commented on (likes >= 1 or comments >= 1)
     fetch("http://localhost:3002/videos", {
@@ -153,9 +164,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
                     />
                     <Box p={3}>
                       <Text fontWeight="semibold">{video.title}</Text>
-                      <Text fontSize="sm" color="gray.500">
-                        {video.likesCount} likes • {video.viewsCount} views
-                      </Text>
                     </Box>
                   </Box>
                 ))}

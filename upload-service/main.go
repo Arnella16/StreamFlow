@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -94,6 +95,19 @@ func handleUpload(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "No video file uploaded")
 	}
 
+	// Extract metadata fields from form-data
+    title := c.FormValue("title")
+    description := c.FormValue("description")
+    uploader := c.FormValue("uploader")
+    durationStr := c.FormValue("duration")
+	var duration float64
+	if durationStr != "" {
+		parsed, err := strconv.ParseFloat(durationStr, 64)
+		if err == nil {
+			duration = parsed
+		}
+	}
+
 	uploadDir := "./uploads"
 	savePath := filepath.Join(uploadDir, file.Filename)
 
@@ -103,14 +117,17 @@ func handleUpload(c *fiber.Ctx) error {
 
 	// Notify Socials service
 	resp, err := resty.New().R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(map[string]string{
-			"id":        file.Filename,
-			"title":     file.Filename,
-			"thumbnail": "https://picsum.photos/seed/" + file.Filename + "/640/360",
-			"path":      "http://localhost:3001/uploads/" + file.Filename,
-		}).
-		Post("http://localhost:3002/init")
+	SetHeader("Content-Type", "application/json").
+	SetBody(map[string]interface{}{
+		"id":          file.Filename,
+		"title":       title,
+		"description": description,
+		"author":      uploader,
+		"thumbnail":   "https://picsum.photos/seed/" + file.Filename + "/640/360",
+		"path":        "http://localhost:3001/uploads/" + file.Filename,
+		"duration":    duration, 
+	}).Post("http://localhost:3002/init")
+
 
 	if err != nil {
 		log.Println("❌ Socials service failed:", err)
@@ -151,7 +168,7 @@ func main() {
 
 	// CORS
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:8081, http://localhost:8081",
+		AllowOrigins:     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:8081,http://localhost:8081",
 		AllowMethods:     "GET,POST,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -218,4 +235,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

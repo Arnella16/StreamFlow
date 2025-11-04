@@ -16,10 +16,17 @@ import (
 
 // Define struct for video social info
 type VideoSocial struct {
-	ID        string   `json:"id" bson:"_id"`
-	Likes     int      `json:"likes" bson:"likes"`
-	Comments  []string `json:"comments" bson:"comments"`
-	CreatedAt time.Time `json:"createdAt" bson:"createdAt"`
+	ID          string    `json:"id" bson:"_id"`
+	Title       string    `json:"title" bson:"title"`
+	Description string    `json:"description" bson:"description"`
+	Author      string    `json:"author" bson:"author"`
+	Thumbnail   string    `json:"thumbnail" bson:"thumbnail"`
+	Path        string    `json:"path" bson:"path"`
+	Duration    float64   `json:"duration" bson:"duration"`
+	Views       int       `json:"views" bson:"views"`
+	Likes       int       `json:"likes" bson:"likes"`
+	Comments    []string  `json:"comments" bson:"comments"`
+	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 }
 
 var collection *mongo.Collection
@@ -73,23 +80,30 @@ func main() {
 	// Create social record when video is uploaded
 	app.Post("/init", func(c *fiber.Ctx) error {
 		var payload struct {
-			ID        string `json:"id"`
-			Title     string `json:"title"`
-			Thumbnail string `json:"thumbnail"`
-			Path      string `json:"path"`
+			ID          string  `json:"id"`
+			Title       string  `json:"title"`
+			Description string  `json:"description"`
+			Author      string  `json:"author"`
+			Thumbnail   string  `json:"thumbnail"`
+			Path        string  `json:"path"`
+			Duration    float64 `json:"duration"`
 		}
 		if err := c.BodyParser(&payload); err != nil {
 			return c.Status(400).SendString("Invalid payload")
 		}
 
 		doc := bson.M{
-			"_id":       payload.ID,
-			"title":     payload.Title,
-			"thumbnail": payload.Thumbnail,
-			"path":      payload.Path,
-			"likes":     0,
-			"comments":  []string{},
-			"createdAt": time.Now(),
+			"_id":         payload.ID,
+			"title":       payload.Title,
+			"description": payload.Description,
+			"author":      payload.Author,
+			"thumbnail":   payload.Thumbnail,
+			"path":        payload.Path,
+			"duration":    payload.Duration,
+			"views":       0,
+			"likes":       0,
+			"comments":    []string{},
+			"createdAt":   time.Now(),
 		}
 
 		_, err := collection.InsertOne(ctx, doc)
@@ -100,11 +114,14 @@ func main() {
 		return c.JSON(fiber.Map{"status": "ok", "video": payload.ID})
 	})
 
-	app.Post("/videos/:title/like", func(c *fiber.Ctx) error {
-		title := c.Params("title")
-		ctx := context.Background()
+	// Like a video by ID
+	app.Post("/videos/:id/like", func(c *fiber.Ctx) error {
+		id := c.Params("id")
 
-		_, err := collection.UpdateOne(ctx, bson.M{"title": title}, bson.M{"$inc": bson.M{"likes": 1}})
+		_, err := collection.UpdateOne(ctx,
+			bson.M{"_id": id},
+			bson.M{"$inc": bson.M{"likes": 1}},
+		)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -112,8 +129,9 @@ func main() {
 		return c.JSON(fiber.Map{"message": "Like added"})
 	})
 
-	app.Post("/videos/:title/comment", func(c *fiber.Ctx) error {
-		title := c.Params("title")
+	// Add a comment
+	app.Post("/videos/:id/comment", func(c *fiber.Ctx) error {
+		id := c.Params("id")
 		var body struct {
 			Text string `json:"text"`
 		}
@@ -121,9 +139,8 @@ func main() {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 		}
 
-		ctx := context.Background()
 		_, err := collection.UpdateOne(ctx,
-			bson.M{"title": title},
+			bson.M{"_id": id},
 			bson.M{"$push": bson.M{"comments": body.Text}},
 		)
 		if err != nil {
@@ -133,7 +150,21 @@ func main() {
 		return c.JSON(fiber.Map{"message": "Comment added"})
 	})
 
+	// Increment view count
+	app.Post("/videos/:id/view", func(c *fiber.Ctx) error {
+		id := c.Params("id")
 
+		_, err := collection.UpdateOne(ctx,
+			bson.M{"_id": id},
+			bson.M{"$inc": bson.M{"views": 1}},
+		)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		return c.JSON(fiber.Map{"message": "View count incremented"})
+	})
+	
 	// Get social info for a video
 	app.Get("/video/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")

@@ -31,7 +31,7 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
   const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
-    fetch(`http://localhost:8081/social/api/video/${video.title}`)
+    fetch(`http://localhost:8081/social/api/video/${video.id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.likes !== undefined) setLikes(data.likes);
@@ -45,18 +45,28 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
       videoRef.current.currentTime = 0;
       const p = videoRef.current.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
+
+      // 👇 Add view count update when video starts playing
+      const handlePlay = () => {
+        fetch(`http://localhost:8081/social/api/videos/${video.id}/view`, { method: "POST" })
+          .catch(() => {});
+      };
+      videoRef.current.addEventListener("play", handlePlay);
+      return () => {
+        videoRef.current?.removeEventListener("play", handlePlay);
+      };
     }
   }, [video]);
 
   const handleLike = () => {
-    fetch(`http://localhost:8081/social/api/videos/${video.title}/like`, { method: "POST" })
+    fetch(`http://localhost:8081/social/api/videos/${video.id}/like`, { method: "POST" })
       .then(() => setLikes((prev) => prev + 1))
       .catch(() => {});
   };
 
   const handleComment = () => {
     if (!newComment.trim()) return;
-    fetch(`http://localhost:8081/social/api/videos/${video.title}/comment`, {
+    fetch(`http://localhost:8081/social/api/videos/${video.id}/comment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: newComment }),

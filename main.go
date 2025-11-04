@@ -19,6 +19,22 @@ import (
 
 var serviceProcs []*os.Process
 
+// Start NPM/Vite dev server
+func startNpmDev(dir string) {
+    cmd := exec.Command("npm", "run", "dev")
+    cmd.Dir = dir
+    cmd.Stdout = log.Writer()
+    cmd.Stderr = log.Writer()
+
+    if err := cmd.Start(); err != nil {
+        log.Fatalf("Failed to start Vite dev server: %v", err)
+    }
+
+    serviceProcs = append(serviceProcs, cmd.Process)
+    log.Printf("Vite dev server started (PID %d)", cmd.Process.Pid)
+}
+
+
 // Kill processes occupying a port
 func killPort(port string) {
 	switch runtime.GOOS {
@@ -62,7 +78,7 @@ func waitForTCP(addr string, timeout time.Duration) error {
 	return fmt.Errorf("timeout waiting for %s", addr)
 }
 
-// Start a microservice (name = for logs, dir = working dir, addr = host:port to wait for)
+// Start a microservice
 func startService(name, dir, addr string) {
 	cmd := exec.Command("go", "run", "main.go")
 	cmd.Dir = dir
@@ -87,12 +103,16 @@ func startService(name, dir, addr string) {
 
 func main() {
 	// Kill ports that might conflict
-	killPort("3000")
-	killPort("3001")
-	killPort("3002")
-	killPort("8081") // gateway port
+	killPort("3000") // auth
+	killPort("3001") // upload
+	killPort("3002") // social
+	killPort("8080") // search/playback (Elasticsearch)
+	killPort("8083") // HLS streaming
+	killPort("8081") // gateway
+	killPort("5173") // Vite dev server
 
-	// Microservices to start (name, directory, host:port to wait for)
+
+	// Microservices to start
 	services := []struct {
 		name string
 		dir  string
@@ -101,15 +121,16 @@ func main() {
 		{"auth-service", "./auth-service", "127.0.0.1:3000"},
 		{"upload-service", "./upload-service", "127.0.0.1:3001"},
 		{"social-service", "./social-service", "127.0.0.1:3002"},
-		{"playback-service", "./playback-service", "127.0.0.1:8080"},
+		{"search-service", "./search-service", "127.0.0.1:8080"},
+		{"hls-service", "./playback-service", "127.0.0.1:8083"},
 	}
 
-	// Graceful shutdown of microservices
+	// Graceful shutdown
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigs
-		log.Println("Shutting down services...")
+		log.Println("\n🛑 Shutting down services...")
 		for _, proc := range serviceProcs {
 			if proc != nil {
 				_ = proc.Kill()
@@ -119,10 +140,14 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Start all microservices (only once)
+	// Start all microservices
 	for _, s := range services {
 		startService(s.name, s.dir, s.addr)
 	}
+
+	// Run Vite frontend in dev mode
+	startNpmDev("./client")
+
 
 	// --------------------------
 	// Start Gateway
@@ -141,12 +166,14 @@ func main() {
 	frontendDir := "./client/dist"
 	app.Static("/", frontendDir)
 
-	// Fallback for React Router — allow API proxy prefixes through
+	// Fallback for React Router - allow API and HLS routes through
 	app.Use(func(c *fiber.Ctx) error {
 		path := c.Path()
 		if strings.HasPrefix(path, "/auth/api") ||
 			strings.HasPrefix(path, "/upload/api") ||
-			strings.HasPrefix(path, "/social/api") {
+			strings.HasPrefix(path, "/social/api") ||
+			strings.HasPrefix(path, "/search/api") ||
+			strings.HasPrefix(path, "/hls") {
 			return c.Next()
 		}
 		return c.SendFile(frontendDir + "/index.html")
@@ -164,8 +191,9 @@ func main() {
 	app.All("/auth/api/*", forward("/auth/api", "http://127.0.0.1:3000"))
 	app.All("/upload/api/*", forward("/upload/api", "http://127.0.0.1:3001"))
 	app.All("/social/api/*", forward("/social/api", "http://127.0.0.1:3002"))
+	app.All("/search/api/*", forward("/search/api", "http://127.0.0.1:8080"))
+	app.All("/hls/*", forward("/hls", "http://127.0.0.1:8083"))
 
-	log.Println("Gateway running at http://127.0.0.1:8081")
+	log.Println("🚀 Gateway running at http://127.0.0.1:8081")
 	log.Fatal(app.Listen(":8081"))
 }
-

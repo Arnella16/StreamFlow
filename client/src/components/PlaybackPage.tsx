@@ -6,7 +6,6 @@ import {
   Text,
   VStack,
   Divider,
-  useColorModeValue,
   Heading,
   Input,
 } from "@chakra-ui/react";

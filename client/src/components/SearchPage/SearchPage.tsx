@@ -37,7 +37,7 @@ interface SearchPageProps {
   onVideoSelect?: (video: UploadedVideo) => void;
 }
 
-const SearchPage: React.FC<SearchPageProps> = ({ user, onGoBack, onVideoSelect }) => {
+const SearchPage: React.FC<SearchPageProps> = ({onGoBack, onVideoSelect }) => {
   const bg = useColorModeValue("gray.50", "gray.900");
   const [query, setQuery] = useState("");
   const [videos, setVideos] = useState<UploadedVideo[]>([]);

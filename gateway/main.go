@@ -10,55 +10,61 @@ import (
 )
 
 func main() {
-	app := fiber.New()
+	// --------------------------
+// Start Gateway
+// --------------------------
+app := fiber.New()
 
-	// --------------------------
-	// CORS for all requests
-	// --------------------------
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:8081,http://localhost:3000", // Or restrict to your frontend: "http://localhost:8081"
-		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-		AllowHeaders:     "Content-Type, Authorization",
-		AllowCredentials: true,
-	}))
+// CORS for frontend
+app.Use(cors.New(cors.Config{
+    AllowOrigins:     "http://127.0.0.1:8081,http://localhost:5173",
+    AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    AllowHeaders:     "Content-Type,Authorization",
+    AllowCredentials: true,
+}))
 
-	// --------------------------
-	// Serve React frontend (Vite build)
-	// --------------------------
-	frontendDir := "./client/dist"
-	app.Static("/", frontendDir)
+// ---------------------------------------------
+// Proxy ALL non-API routes to Vite Dev Server
+// ---------------------------------------------
+app.Use(func(c *fiber.Ctx) error {
+    path := c.Path()
 
-	// Fallback for React Router
-	app.Use(func(c *fiber.Ctx) error {
-		path := c.Path()
-		if strings.HasPrefix(path, "/auth/api") ||
-			strings.HasPrefix(path, "/upload/api") ||
-			strings.HasPrefix(path, "/social/api") {
-			return c.Next()
-		}
-		return c.SendFile(frontendDir + "/index.html")
-	})
+    // Allow API routes to continue normally
+    if strings.HasPrefix(path, "/auth/api") ||
+        strings.HasPrefix(path, "/upload/api") ||
+        strings.HasPrefix(path, "/social/api") ||
+        strings.HasPrefix(path, "/search/api") ||
+        strings.HasPrefix(path, "/hls") {
 
-	// --------------------------
-	// Helper to forward API routes to microservices
-	// --------------------------
-	forward := func(prefix, target string) fiber.Handler {
-		return func(c *fiber.Ctx) error {
-			trimmed := strings.TrimPrefix(c.OriginalURL(), prefix)
-			return proxy.Do(c, target+trimmed)
-		}
-	}
+        return c.Next()
+    }
 
-	// --------------------------
-	// API Proxy routes
-	// --------------------------
-	app.All("/auth/api/*", forward("/auth/api", "http://127.0.0.1:3000/api/auth"))
-	app.All("/upload/api/*", forward("/upload/api", "http://127.0.0.1:3001"))
-	app.All("/social/api/*", forward("/social/api", "http://127.0.0.1:3002"))
+    // Everything else goes to Vite dev server
+    target := "http://localhost:5173" + c.OriginalURL()
+    return proxy.Do(c, target)
+})
 
-	// --------------------------
-	// Start Gateway server
-	// --------------------------
-	log.Println("Gateway running on port 8081")
-	log.Fatal(app.Listen(":8081"))
+// Proxy helper
+forward := func(prefix, target string) fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        trimmed := strings.TrimPrefix(c.OriginalURL(), prefix)
+        return proxy.Do(c, target+trimmed)
+    }
+}
+
+// --------------------------
+// API proxy routes
+// --------------------------
+app.All("/auth/api/*", forward("/auth/api", "http://127.0.0.1:3000"))
+app.All("/upload/api/*", forward("/upload/api", "http://127.0.0.1:3001"))
+app.All("/social/api/*", forward("/social/api", "http://127.0.0.1:3002"))
+app.All("/search/api/*", forward("/search/api", "http://127.0.0.1:8080"))
+app.All("/hls/*", forward("/hls", "http://127.0.0.1:8083"))
+
+// --------------------------
+// Start server
+// --------------------------
+log.Println("🚀 Gateway running at http://127.0.0.1:8081")
+log.Fatal(app.Listen(":8081"))
+
 }

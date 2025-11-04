@@ -9,7 +9,6 @@ import {
   Heading,
   Input,
 } from "@chakra-ui/react";
-import { ArrowLeft } from "lucide-react";
 
 interface PlaybackPageProps {
   video: {
@@ -24,12 +23,17 @@ interface PlaybackPageProps {
   onGoDashboard?: () => void;
 }
 
-const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashboard }) => {
+const PlaybackPage: React.FC<PlaybackPageProps> = ({
+  video,
+  onGoBack,
+  onGoDashboard,
+}) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [likes, setLikes] = useState<number>(0);
   const [comments, setComments] = useState<string[]>([]);
   const [newComment, setNewComment] = useState("");
 
+  // ✅ Fetch like/comment data
   useEffect(() => {
     fetch(`http://localhost:8081/social/api/video/${video.id}`)
       .then((res) => res.json())
@@ -40,32 +44,84 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
       .catch(() => {});
   }, [video]);
 
+  // ✅ Start video & count views on play
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      const p = videoRef.current.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
+    if (!videoRef.current) return;
 
-      // 👇 Add view count update when video starts playing
-      const handlePlay = () => {
-        fetch(`http://localhost:8081/social/api/videos/${video.id}/view`, { method: "POST" })
-          .catch(() => {});
-      };
-      videoRef.current.addEventListener("play", handlePlay);
-      return () => {
-        videoRef.current?.removeEventListener("play", handlePlay);
-      };
-    }
+    videoRef.current.currentTime = 0;
+    const playPromise = videoRef.current.play();
+    if (playPromise?.catch) playPromise.catch(() => {});
+
+    const handlePlay = () => {
+      fetch(`http://localhost:8081/social/api/videos/${video.id}/view`, {
+        method: "POST",
+      }).catch(() => {});
+    };
+
+    videoRef.current.addEventListener("play", handlePlay);
+    return () =>
+      videoRef.current?.removeEventListener("play", handlePlay);
   }, [video]);
 
+  // ✅ Keyboard shortcuts handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const vid = videoRef.current;
+      if (!vid) return;
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          vid.paused ? vid.play() : vid.pause();
+          break;
+
+        case "ArrowRight":
+          vid.currentTime += 10;
+          break;
+
+        case "ArrowLeft":
+          vid.currentTime -= 10;
+          break;
+
+        case "ArrowUp":
+          vid.volume = Math.min(1, vid.volume + 0.1);
+          break;
+
+        case "ArrowDown":
+          vid.volume = Math.max(0, vid.volume - 0.1);
+          break;
+
+        case "m":
+          vid.muted = !vid.muted;
+          break;
+
+        case "f":
+          if (!document.fullscreenElement) vid.requestFullscreen();
+          else document.exitFullscreen();
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // ✅ Like handler
   const handleLike = () => {
-    fetch(`http://localhost:8081/social/api/videos/${video.id}/like`, { method: "POST" })
+    fetch(`http://localhost:8081/social/api/videos/${video.id}/like`, {
+      method: "POST",
+    })
       .then(() => setLikes((prev) => prev + 1))
       .catch(() => {});
   };
 
+  // ✅ Comment handler
   const handleComment = () => {
     if (!newComment.trim()) return;
+
     fetch(`http://localhost:8081/social/api/videos/${video.id}/comment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,7 +136,7 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
 
   return (
     <Box minH="100vh" bg="black" color="white" px={4} py={6}>
-      {/* Top bar with buttons */}
+      {/* ✅ Top Navigation */}
       <Box display="flex" justifyContent="space-between" mb={4}>
         <Button onClick={onGoBack} colorScheme="blue" size="sm">
           ⬅ Back
@@ -88,14 +144,13 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
 
         {onGoDashboard && (
           <Button onClick={onGoDashboard} colorScheme="green" size="sm">
-            🏠 Back to Dashboard
+            🏠 Dashboard
           </Button>
         )}
       </Box>
 
-      {/* Split Layout */}
       <Box display="flex" gap={6}>
-        {/* Left: Video Section */}
+        {/* ✅ LEFT: VIDEO PLAYER */}
         <Box flex="3">
           <AspectRatio ratio={16 / 9} bg="black" mb={4}>
             <video
@@ -106,38 +161,16 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
             />
           </AspectRatio>
 
-          <Box>
-            <Text fontSize="2xl" fontWeight="bold">
-              {video.title}
-            </Text>
-            <Text fontSize="sm" color="gray.400">
-              {video.channel ?? "Uploaded by you"} • {video.views ?? "0"} views
-            </Text>
-          </Box>
+          <Text fontSize="2xl" fontWeight="bold">
+            {video.title}
+          </Text>
+          <Text fontSize="sm" color="gray.400">
+            {video.channel ?? "Uploaded by you"} • {video.views ?? "0"} views
+          </Text>
         </Box>
 
-        {/* Right: Likes & Comments Section */}
+        {/* ✅ RIGHT: Sidebar */}
         <Box flex="1" bg="gray.900" p={4} borderRadius="md">
-          {/* ✅ Added buttons ABOVE Likes & Comments */}
-          <Box display="flex" justifyContent="space-between" mb={4}>
-            <Button
-              onClick={onGoBack}
-              leftIcon={<ArrowLeft size={16} />}
-              variant="ghost"
-              size="sm"
-              colorScheme="blue"
-            >
-              Back to Search
-            </Button>
-
-            {onGoDashboard && (
-              <Button onClick={onGoDashboard} colorScheme="green" size="sm">
-                 Dashboard
-              </Button>
-            )}
-          </Box>
-
-          {/* Existing Likes and Comments Section */}
           <Heading size="md" mb={3}>
             ❤️ Likes & 💬 Comments
           </Heading>
@@ -155,7 +188,8 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({ video, onGoBack, onGoDashbo
 
           <VStack align="stretch" spacing={3}>
             <Text fontWeight="bold">Comments:</Text>
-            {comments.length > 0 ? (
+
+            {comments.length ? (
               comments.map((c, idx) => (
                 <Box key={idx} p={2} bg="gray.800" borderRadius="md">
                   {c}

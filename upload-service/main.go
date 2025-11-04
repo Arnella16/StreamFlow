@@ -64,28 +64,41 @@ func waitForPortRelease(port string, timeout time.Duration) error {
 // ------------------- CHUNK VIDEO -----------------------
 
 func chunkVideo(inputPath string) error {
-	base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
-	outDir := filepath.Join("uploads", base+"_hls")
+    base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
+    outDir := filepath.Join("uploads", base+"_hls")
 
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return err
-	}
+    if err := os.MkdirAll(outDir, 0755); err != nil {
+        return err
+    }
 
-	cmd := exec.Command("ffmpeg",
-		"-i", inputPath,
-		"-profile:v", "baseline",
-		"-level", "3.0",
-		"-start_number", "0",
-		"-hls_time", "10",
-		"-hls_list_size", "0",
-		"-f", "hls",
-		filepath.Join(outDir, "index.m3u8"),
-	)
+    cmd := exec.Command("ffmpeg",
+        "-i", inputPath,
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+        // ✅ Recommended encoding settings
+        "-c:v", "h264",
+        "-preset", "veryfast",
+        "-profile:v", "baseline",
+        "-level", "3.1",
+
+        // ✅ Audio
+        "-c:a", "aac",
+        "-b:a", "128k",
+
+        // ✅ HLS settings (THE IMPORTANT PART)
+        "-hls_time", "6",                         // 6-second segments
+        "-hls_playlist_type", "vod",              // ✅ VOD → fixes duration issue
+        "-hls_flags", "independent_segments",     // ✅ enables perfect seeking
+        "-hls_segment_type", "mpegts",
+        "-hls_list_size", "0",
+
+        filepath.Join(outDir, "index.m3u8"),
+    )
+
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    return cmd.Run()
 }
+
 
 // ------------------- UPLOAD HANDLER ---------------------
 

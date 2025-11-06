@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -28,8 +29,22 @@ const indexName = "videos"
 func main() {
 	var err error
 
-	// ✅ Initialize Elasticsearch client
-	es, err = elasticsearch.NewDefaultClient()
+	// ✅ Get the URL from the environment variable
+	esURL := os.Getenv("ELASTICSEARCH_URL")
+	if esURL == "" {
+		// Fallback to localhost if no variable is set
+		esURL = "http://localhost:9200"
+		log.Printf("ELASTICSEARCH_URL not set, defaulting to %s", esURL)
+	}
+
+	cfg := elasticsearch.Config{
+		Addresses: []string{
+			esURL,
+		},
+	}
+
+	es, err = elasticsearch.NewClient(cfg)
+
 	if err != nil {
 		log.Fatalf("Error creating ES client: %s", err)
 	}
@@ -198,7 +213,6 @@ func sentenceSearchHandler(c *fiber.Ctx) error {
 	return executeSearch(c, queryBody)
 }
 
-
 func searchHandler(c *fiber.Ctx) error {
 	query := c.Query("q")
 	if query == "" {
@@ -235,7 +249,6 @@ func fuzzySearchHandler(c *fiber.Ctx) error {
 	return executeSearch(c, queryBody)
 }
 
-
 func executeSearch(c *fiber.Ctx, queryBody interface{}) error {
 	var buf bytes.Buffer
 	json.NewEncoder(&buf).Encode(queryBody)
@@ -268,4 +281,3 @@ func executeSearch(c *fiber.Ctx, queryBody interface{}) error {
 
 	return c.JSON(videos)
 }
-

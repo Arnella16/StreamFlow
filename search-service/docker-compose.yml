@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    restart: always
+    networks:
+      - elastic_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  go-search-service:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy # This now waits for the healthcheck
+    restart: always
+    networks:
+      - elastic_net
+
+volumes:
+  esdata:
+
+networks:
+  elastic_net:

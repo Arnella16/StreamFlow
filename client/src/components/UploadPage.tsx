@@ -12,6 +12,7 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { FormControl, FormLabel } from "@chakra-ui/react";
+import Navbar from "./Navbar";
 import { useState, useEffect } from "react";
 
 interface UploadedVideo {
@@ -175,7 +176,8 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
   };
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} py={12} px={4}>
+    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} pt="80px" px={4}>
+      <Navbar />
       <Center>
         <Box
           w="full"

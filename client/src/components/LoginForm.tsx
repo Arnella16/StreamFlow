@@ -83,7 +83,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
   const borderColor = useColorModeValue("gray.200", "gray.700");
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} py={12} px={4}>
+    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} pt="80px" px={4}>
       <Center>
         <Box
           w="full"

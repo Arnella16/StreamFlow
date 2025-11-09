@@ -26,7 +26,8 @@ interface UploadedVideo {
   title: string;
   description: string;
   fileUrl: string;
-  uploader: string;
+  thumbnail: string;
+  author: string;
   views: number;
   createdAt: string;
 }
@@ -174,30 +175,58 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
             gap={6}
           >
             {videos.map((video) => (
-              <Box
-                key={video._id}
-                onClick={() => onVideoSelect?.(video)}
-                cursor="pointer"
-                borderRadius="md"
-                overflow="hidden"
-                bg={useColorModeValue("white", "gray.800")}
-                boxShadow="md"
-                _hover={{ transform: "scale(1.02)" }}
-                transition="0.2s"
-              >
+            <Box
+              key={video._id}
+              onClick={() => onVideoSelect?.(video)}
+              cursor="pointer"
+              borderRadius="md"
+              overflow="hidden"
+              bg={useColorModeValue("white", "gray.800")}
+              boxShadow="md"
+              _hover={{ transform: "scale(1.02)" }}
+              transition="0.2s"
+            >
+              <Box position="relative">
                 <AspectRatio ratio={16 / 9}>
-                  <video src={video.fileUrl} muted />
+                  {video.thumbnail ? (
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <video src={video.fileUrl} muted />
+                  )}
                 </AspectRatio>
-                <Box p={3}>
-                  <Text fontWeight="semibold" noOfLines={1}>
-                    {video.title}
-                  </Text>
-                  <Text fontSize="sm" color="gray.500" noOfLines={1}>
-                    {video.uploader}
-                  </Text>
+
+                {/* Optional play overlay */}
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                  bg="blackAlpha.600"
+                  p={2}
+                  borderRadius="full"
+                >
+                  ▶
                 </Box>
               </Box>
-            ))}
+
+              <Box p={3}>
+                <Text fontWeight="semibold" noOfLines={1}>
+                  {video.title}
+                </Text>
+                <Text fontSize="sm" color="gray.500" noOfLines={1}>
+                  {video.author}
+                </Text>
+              </Box>
+            </Box>
+          ))}
           </Box>
         )}
       </Container>

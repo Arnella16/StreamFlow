@@ -16,7 +16,7 @@ interface PlaybackPageProps {
     title: string;
     src: string;
     thumbnail: string;
-    channel?: string;
+    author?: string;
     views?: string;
   };
   onGoBack?: () => void;
@@ -135,22 +135,22 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({
   };
 
   return (
-    <Box minH="100vh" bg="black" color="white" px={4} py={6}>
+    <Box minH="100vh" bg="black" color="white" px={4} py={6} pt="80px">
       {/* ✅ Top Navigation */}
       <Box display="flex" justifyContent="space-between" mb={4}>
-        <Button onClick={onGoBack} colorScheme="blue" size="sm">
-          ⬅ Back
+        <Button onClick={onGoBack} colorScheme="blue" size="sm" variant="solid">
+          ⬅ Back to Search
         </Button>
 
         {onGoDashboard && (
-          <Button onClick={onGoDashboard} colorScheme="green" size="sm">
+          <Button onClick={onGoDashboard} colorScheme="green" size="sm" variant="solid">
             🏠 Dashboard
           </Button>
         )}
       </Box>
 
       <Box display="flex" gap={6}>
-        {/* ✅ LEFT: VIDEO PLAYER */}
+        {/* LEFT: Video Player */}
         <Box flex="3">
           <AspectRatio ratio={16 / 9} bg="black" mb={4}>
             <video
@@ -165,11 +165,11 @@ const PlaybackPage: React.FC<PlaybackPageProps> = ({
             {video.title}
           </Text>
           <Text fontSize="sm" color="gray.400">
-            {video.channel ?? "Uploaded by you"} • {video.views ?? "0"} views
+            {video.author ?? "Unknown"} • {video.views ?? "0"} views
           </Text>
         </Box>
 
-        {/* ✅ RIGHT: Sidebar */}
+        {/* RIGHT: Sidebar */}
         <Box flex="1" bg="gray.900" p={4} borderRadius="md">
           <Heading size="md" mb={3}>
             ❤️ Likes & 💬 Comments

@@ -11,6 +11,7 @@ import {
   Image,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import Navbar from "./Navbar";
 
 interface User {
   _id: string;
@@ -22,7 +23,7 @@ interface User {
 interface Video {
   id: string;
   title: string;
-  thumbnailUrl: string;
+  thumbnail: string;
   likesCount: number;
   viewsCount: number;
   comments?: string[];
@@ -57,7 +58,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
         const mapped = data.map((v) => ({
           id: v._id || v.id,
           title: v.title || "Untitled Video",
-          thumbnailUrl: v.thumbnail || "https://via.placeholder.com/150",
+          thumbnail: v.thumbnail || "https://via.placeholder.com/150",
           likesCount: v.likes || 0,
           viewsCount: v.views || 0,
           comments: v.comments || [],
@@ -79,7 +80,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
         const mapped = likedOrCommented.map((v) => ({
           id: v.id,
           title: v.title,
-          thumbnailUrl: v.thumbnail || "https://via.placeholder.com/150",
+          thumbnail: v.thumbnail || "https://via.placeholder.com/150",
           likesCount: v.likes || 0,
           viewsCount: v.views || 0,
           likedByUser: v.likes && v.likes > 0,
@@ -105,7 +106,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
   }
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} py={12} px={4}>
+    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} pt="80px" px={4}>
+      <Navbar />
       <Center>
         <Box
           w="full"
@@ -119,7 +121,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
         >
           <VStack gap={6} align="stretch">
             <Button onClick={onGoBack} colorScheme="blue" size="md" alignSelf="flex-start">
-              ← Go Back to Dashboard
+              ← Back to Dashboard
             </Button>
 
             <Center>
@@ -156,7 +158,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
                     boxShadow="sm"
                   >
                     <Image
-                      src={video.thumbnailUrl || "https://via.placeholder.com/150"}
+                      src={video.thumbnail || "https://via.placeholder.com/150"}
                       alt={video.title}
                       w="full"
                       h="150px"
@@ -189,7 +191,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
                     boxShadow="sm"
                   >
                     <Image
-                      src={video.thumbnailUrl}
+                      src={video.thumbnail}
                       alt={video.title}
                       w="full"
                       h="150px"

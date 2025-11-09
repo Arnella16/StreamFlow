@@ -15,6 +15,7 @@ import {
   Divider,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
+import Navbar from "./Navbar";
 
 interface User {
   _id: string;
@@ -79,7 +80,8 @@ const Dashboard = ({ user, onLogout, onViewProfile, onGoToUpload, onWatchVideos 
   };
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} py={12} px={4}>
+    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} pt="80px" px={4}>
+      <Navbar />
       <Center>
         <Box w="full" maxW="4xl">
           <VStack gap={6} align="stretch">

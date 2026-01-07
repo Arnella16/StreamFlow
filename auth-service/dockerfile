@@ -1,21 +1,24 @@
-FROM golang:1.25-alpine AS builder
+# Stage 1: Build
+FROM golang:1.25.1-alpine AS builder
 WORKDIR /app
 
-COPY go.mod go.sum ./
+# Install git (needed for 'bloom' dependency)
+RUN apk add --no-cache git
+
+COPY go.mod ./
+COPY go.sum ./
 RUN go mod download
-
 COPY . .
-RUN go build -o auth-service main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/auth-service .
 
-FROM alpine:3.18
+# Stage 2: Final Image
+FROM alpine:latest
 WORKDIR /app
+COPY --from=builder /app/auth-service /app/auth-service
 
-COPY --from=builder /app/auth-service .
-COPY .env . 
+# This is for your app.Static("/", "./public")
+# If you have a 'public' folder, you need to copy it
+# COPY --from=builder /app/public ./public
 
 EXPOSE 3000
-ENV PORT=3000 \
-    MONGODB_URI=mongodb://mongo:27017 \
-    JWT_SECRET=supersecretkey
-
-CMD ["./auth-service"]
+ENTRYPOINT ["/app/auth-service"]

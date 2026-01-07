@@ -19,7 +19,7 @@ interface UploadedVideo {
   _id: string;
   title: string;
   description: string;
-  uploader: string;
+  author: string;
   path: string;
   thumbnail: string;
   duration: number;
@@ -54,7 +54,7 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
   const [duration, setDuration] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:3001/videos")
+    fetch("http://98.70.25.253:3001/videos")
       .then((res) => res.json())
       .then((data) => setUploadedVideos(data))
       .catch((err) => console.error("Error fetching videos:", err));
@@ -148,7 +148,7 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
     }
 
     try {
-      const res = await fetch("http://localhost:3001/", {
+      const res = await fetch("http://98.70.25.253:3001/", {
         method: "POST",
         body: formData,
       });
@@ -238,7 +238,7 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
             </VStack>
 
             <Heading size="md" mt={8}>
-              Uploaded Videos
+              Videos
             </Heading>
 
             {uploadedVideos.length === 0 ? (
@@ -264,7 +264,6 @@ const UploadPage: React.FC<UploadProps> = ({ user, onGoBack }) => {
                     />
                     <Box p={3}>
                       <Text fontWeight="bold">{video.title}</Text>
-                      <Text fontSize="xs" color="gray.400">By {user.username}</Text>
                     </Box>
                   </Box>
                 ))}

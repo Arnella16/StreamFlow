@@ -45,7 +45,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await fetch("http://98.70.25.253:3000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

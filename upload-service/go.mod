@@ -1,6 +1,6 @@
-module video-service
+module stream-flow/upload-service
 
-go 1.22.2
+go 1.25.1
 
 require (
 	github.com/go-resty/resty/v2 v2.16.5

@@ -54,7 +54,7 @@ func main() {
 
 	// ✅ FIX CORS ERRORS HERE
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://127.0.0.1:8081, http://localhost:5173",
+		AllowOrigins: "http://98.70.25.253, http://98.70.25.253:8081, http://localhost:8081, http://98.70.25.253:5173",
 		AllowHeaders: "Origin, Content-Type, Accept",
 		AllowMethods: "GET, POST, OPTIONS",
 	}))

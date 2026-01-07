@@ -1,0 +1,17 @@
+docker run -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+
+
+
+docker run: This is the fundamental command to create and start a new Docker container from an image.
+
+-p 9200:9200 and -p 9300:9300: The -p flag publishes or maps a network port from your computer (the host) to the container.
+
+9200:9200 connects port 9200 on your computer to port 9200 inside the container. This is the main port you use to send API requests to Elasticsearch.
+
+9300:9300 is for internal communication between Elasticsearch nodes in a cluster.
+
+-e "discovery.type=single-node": The -e flag sets an environment variable inside the container. This specific variable tells Elasticsearch to start up as a single, standalone server and not to look for other servers to form a cluster. This is perfect for local development.
+
+-e "xpack.security.enabled=false": This sets another environment variable that disables the built-in security features like usernames and passwords. This simplifies the setup so you can connect to Elasticsearch without needing to configure authentication.
+
+docker.elastic.co/elasticsearch/elasticsearch:8.10.2: This is the full name of the Docker image to use. It tells Docker to download the official Elasticsearch image, specifically version 8.10.2, from the Elastic Docker registry.

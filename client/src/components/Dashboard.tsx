@@ -44,7 +44,7 @@ const Dashboard = ({ user, onLogout, onViewProfile, onGoToUpload, onWatchVideos 
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch("http://localhost:3000/api/profile", {
+      const res = await fetch("/api/profile", {
         method: "GET",
         headers: { 
           "Authorization": `Bearer ${token}`,

@@ -1,4 +1,4 @@
-module search-service
+module go-search-service-new
 
 go 1.25.1
 

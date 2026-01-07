@@ -8,21 +8,38 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
-	"strconv"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/go-resty/resty/v2"
 )
 
-var esClient = resty.New()
+// --- Global variables to hold service URLs ---
+var (
+	esClient         = resty.New()
+	searchServiceURL = ""
+	socialServiceURL = ""
+	publicURL        = ""
+)
+
+// Helper function to read Env Vars
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	log.Printf("INFO: %s not set, defaulting to %s", key, fallback)
+	return fallback
+}
 
 // ------------------- INDEX INTO ES ---------------------
-
+// This function calls your Search Service API
 func indexVideoInES(id, title, description, author string) {
+	targetURL := fmt.Sprintf("%s/index", searchServiceURL)
+
 	resp, err := esClient.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(map[string]string{
@@ -31,23 +48,20 @@ func indexVideoInES(id, title, description, author string) {
 			"description": description,
 			"author":      author,
 		}).
-		Post("http://localhost:8080/index")
+		Post(targetURL) // Use the environment variable URL
 
 	if err != nil {
-		log.Println("Error sending to Elasticsearch:", err)
+		log.Println("Error sending to Search Service:", err)
 		return
 	}
-
 	if resp.IsError() {
-		log.Println("Elasticsearch error:", resp.String())
+		log.Println("Search Service error:", resp.String())
 		return
 	}
-
-	log.Println("Indexed:", resp.String())
+	log.Println("Indexed via Search Service:", resp.String())
 }
 
 // ------------------- WAIT FOR PORT ---------------------
-
 func waitForPortRelease(port string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -62,57 +76,40 @@ func waitForPortRelease(port string, timeout time.Duration) error {
 }
 
 // ------------------- CHUNK VIDEO -----------------------
-
 func chunkVideo(inputPath string) error {
-    base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
-    outDir := filepath.Join("uploads", base+"_hls")
+	base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
+	outDir := filepath.Join("uploads", base+"_hls")
 
-    if err := os.MkdirAll(outDir, 0755); err != nil {
-        return err
-    }
-
-    cmd := exec.Command("ffmpeg",
-        "-i", inputPath,
-
-        // ✅ Recommended encoding settings
-        "-c:v", "h264",
-        "-preset", "veryfast",
-        "-profile:v", "baseline",
-        "-level", "3.1",
-
-        // ✅ Audio
-        "-c:a", "aac",
-        "-b:a", "128k",
-
-        // ✅ HLS settings (THE IMPORTANT PART)
-        "-hls_time", "6",                         // 6-second segments
-        "-hls_playlist_type", "vod",              // ✅ VOD → fixes duration issue
-        "-hls_flags", "independent_segments",     // ✅ enables perfect seeking
-        "-hls_segment_type", "mpegts",
-        "-hls_list_size", "0",
-
-        filepath.Join(outDir, "index.m3u8"),
-    )
-
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    return cmd.Run()
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return err
+	}
+	cmd := exec.Command("ffmpeg",
+		"-i", inputPath,
+		"-c:v", "h264", "-preset", "veryfast", "-profile:v", "baseline", "-level", "3.1",
+		"-c:a", "aac", "-b:a", "128k",
+		"-hls_time", "6",
+		"-hls_playlist_type", "vod",
+		"-hls_flags", "independent_segments",
+		"-hls_segment_type", "mpegts",
+		"-hls_list_size", "0",
+		filepath.Join(outDir, "index.m3u8"),
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
-
 // ------------------- UPLOAD HANDLER ---------------------
-
 func handleUpload(c *fiber.Ctx) error {
 	file, err := c.FormFile("video")
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "No video file uploaded")
 	}
 
-	// Extract metadata fields from form-data
-    title := c.FormValue("title")
-    description := c.FormValue("description")
-    uploader := c.FormValue("uploader")
-    durationStr := c.FormValue("duration")
+	title := c.FormValue("title")
+	description := c.FormValue("description")
+	uploader := c.FormValue("uploader")
+	durationStr := c.FormValue("duration")
 	var duration float64
 	if durationStr != "" {
 		parsed, err := strconv.ParseFloat(durationStr, 64)
@@ -128,19 +125,21 @@ func handleUpload(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to save video")
 	}
 
-	// Notify Socials service
-	resp, err := resty.New().R().
-	SetHeader("Content-Type", "application/json").
-	SetBody(map[string]interface{}{
-		"id":          file.Filename,
-		"title":       title,
-		"description": description,
-		"author":      uploader,
-		"thumbnail":   "https://picsum.photos/seed/" + file.Filename + "/640/360",
-		"path":        "http://localhost:3001/uploads/" + file.Filename,
-		"duration":    duration, 
-	}).Post("http://localhost:3002/init")
+	// --- Notify Socials service ---
+	socialsTargetURL := fmt.Sprintf("%s/init", socialServiceURL)
+	videoPublicURL := fmt.Sprintf("%s/uploads/%s", publicURL, file.Filename)
 
+	resp, err := resty.New().R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]interface{}{
+			"id":          file.Filename,
+			"title":       title,
+			"description": description,
+			"author":      uploader,
+			"thumbnail":   "https://picsum.photos/seed/" + file.Filename + "/640/360",
+			"path":        "http://98.70.25.253:3001/uploads/" + file.Filename, // Use the public URL
+			"duration":    duration,
+		}).Post(socialsTargetURL)
 
 	if err != nil {
 		log.Println("❌ Socials service failed:", err)
@@ -148,10 +147,10 @@ func handleUpload(c *fiber.Ctx) error {
 		log.Println("❌ Socials service error:", resp.String())
 	}
 
-	// Index into Elasticsearch
+	// --- Index into Elasticsearch (via Search Service) ---
 	go indexVideoInES(file.Filename, title, description, uploader)
 
-	// Chunk video
+	// --- Chunk video ---
 	go func() {
 		if err := chunkVideo(savePath); err != nil {
 			log.Printf("FFmpeg error for %s: %v\n", savePath, err)
@@ -160,18 +159,23 @@ func handleUpload(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Video uploaded successfully",
-		"path":    "/uploads/" + file.Filename,
+		"path":    videoPublicURL,
 	})
 }
 
 // ------------------- MAIN ------------------------------
-
 func main() {
+	// --- Read ALL service URLs from Environment Variables ---
+	searchServiceURL = getEnv("SEARCH_SERVICE_URL", "http://localhost:8080")
+	socialServiceURL = getEnv("SOCIAL_SERVICE_URL", "http://localhost:3002")
+	publicURL = getEnv("PUBLIC_URL", "http://localhost:3001") // Self-referential for path construction
+	// ---
+
 	port := "3001"
 
 	// Kill any process on the port
 	fmt.Println("Cleaning any process using port", port)
-	_ = exec.Command("fuser", "-k", port+"/tcp").Run()
+	_ = exec.Command("fuser", "-k", port+"/tcp").Run() // Needs 'psmisc' package
 
 	if err := waitForPortRelease(port, 3*time.Second); err != nil {
 		log.Fatalf("Port %s is still busy: %v", port, err)
@@ -181,10 +185,9 @@ func main() {
 		BodyLimit: 1024 * 1024 * 1024, // 1 GB
 	})
 
-
 	// CORS
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:8081,http://localhost:8081",
+		AllowOrigins:     "http://98.70.25.253,http://98.70.25.253:5173,http://localhost:5173,http://98.70.25.253:3000,http://localhost:8081,http://98.70.25.253:8081",
 		AllowMethods:     "GET,POST,OPTIONS",
 		AllowHeaders:     "Content-Type,Authorization",
 		AllowCredentials: true,
@@ -197,10 +200,8 @@ func main() {
 	}
 
 	// ---------------- ROUTES ----------------
-
 	app.Static("/uploads", "./uploads")
 	app.Static("/static", "./public")
-
 	app.Post("/", handleUpload)
 	app.Post("/upload", handleUpload)
 
@@ -209,25 +210,35 @@ func main() {
 	})
 
 	app.Get("/videos", func(c *fiber.Ctx) error {
-		files, err := os.ReadDir("./uploads")
-		if err != nil {
-			return fiber.NewError(fiber.StatusInternalServerError, "Cannot read uploads folder")
+		var socialData []struct {
+			ID        string `json:"_id"`
+			Title     string `json:"title"`
+			Thumbnail string `json:"thumbnail"`
+			Path      string `json:"path"`
+			Author    string `json:"author"`
+			Views     int    `json:"views"`
+		}
+
+		httpClient := resty.New()
+		resp, err := httpClient.R().
+			SetResult(&socialData).
+			Get(fmt.Sprintf("%s/videos", socialServiceURL))
+
+		if err != nil || resp.IsError() {
+			log.Println("❌ Failed to fetch videos:", err, resp.String())
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve videos"})
 		}
 
 		var videos []map[string]string
-
-		for _, f := range files {
-			if !f.IsDir() {
-				name := f.Name()
-				if strings.HasSuffix(name, ".mp4") || strings.HasSuffix(name, ".mov") {
-					videos = append(videos, map[string]string{
-						"id":        name,
-						"title":     name,
-						"thumbnail": "https://picsum.photos/seed/" + name + "/640/360",
-						"src":       "http://localhost:3001/uploads/" + name,
-					})
-				}
-			}
+		for _, v := range socialData {
+			videos = append(videos, map[string]string{
+				"id":        v.ID,
+				"title":     v.Title,
+				"thumbnail": v.Thumbnail,
+				"src":       v.Path,
+				"channel":   v.Author,
+				"views":     fmt.Sprintf("%d", v.Views),
+			})
 		}
 
 		return c.JSON(videos)

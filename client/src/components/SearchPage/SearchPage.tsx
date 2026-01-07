@@ -51,8 +51,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
     const loadAll = async () => {
       try {
         setLoading(true);
-        const res = await fetch("http://localhost:3001/videos");
+        const res = await fetch("http://98.70.25.253:3001/videos");
         const data = await res.json();
+        console.log(data)
         setVideos(data);
       } catch (err: any) {
         setError("Failed to load videos");
@@ -68,7 +69,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
     const delay = setTimeout(async () => {
       if (query.trim() === "") {
         // Reload recommended (all videos)
-        const res = await fetch("http://localhost:3001/videos");
+        const res = await fetch("http://98.70.25.253:3001/videos");
         const data = await res.json();
         setVideos(data);
         return;
@@ -79,7 +80,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
         setError("");
 
         const res = await fetch(
-          `http://localhost:8080/sentence-search?q=${query}`
+          `http://98.70.25.253:8080/sentence-search?q=${query}`
         );
 
         if (!res.ok) throw new Error("Search failed");
@@ -89,13 +90,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
         // ✅ Map ES structure into UploadedVideo UI structure
         const mapped = data.map((v: any) => ({
           _id: v.id || v._id || "",
+          id: v.id || v._id || "",
           title: v.title || "",
           description: v.description || "",
-          fileUrl: "/videos/" + (v.id || v._id || "") + ".mp4", // adjust if needed
+          src:"http://98.70.25.253:3001" + "/uploads/" + v.id, // adjust if needed
           uploader: v.author || "Unknown",
           views: 0,
           createdAt: "",
         }));
+        console.log(mapped)
 
         setVideos(mapped);
       } catch (err: any) {
@@ -175,8 +178,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
             gap={6}
           >
             {videos.map((video) => (
-            <Box
-              key={video._id}
+              <Box
+              key={video.title}
               onClick={() => onVideoSelect?.(video)}
               cursor="pointer"
               borderRadius="md"
@@ -202,7 +205,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
                     <video src={video.fileUrl} muted />
                   )}
                 </AspectRatio>
-
                 {/* Optional play overlay */}
                 <Box
                   position="absolute"
@@ -213,11 +215,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ onGoBack, onVideoSelect }) => {
                   p={2}
                   borderRadius="full"
                 >
-                  ▶
                 </Box>
               </Box>
-
-              <Box p={3}>
+             <Box p={3}>
                 <Text fontWeight="semibold" noOfLines={1}>
                   {video.title}
                 </Text>

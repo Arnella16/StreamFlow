@@ -19,7 +19,7 @@ RUN npm run build
 # Stage 2: Build gateway
 # --------------------------
 # Stage 2: Gateway backend
-FROM golang:1.24-alpine AS gateway-builder
+FROM golang:1.25.1-alpine AS gateway-builder
 WORKDIR /app/gateway
 
 # Install git for go modules
@@ -55,7 +55,6 @@ EXPOSE 8081
 
 # Start gateway
 CMD ["./gateway"]
-
 
 
 

@@ -50,12 +50,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
     if (!token) return;
 
    // ✅ Fetch user's uploaded videos (your uploads)
-    fetch("http://localhost:3001/videos", {
+    fetch("http://98.70.25.253:3001/videos", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data: any[]) => {
-        const mapped = data.map((v) => ({
+        console.log(user);
+        const myVideos = data.filter(v => v.channel === user.username);
+        const mapped = myVideos.map((v) => ({
           id: v._id || v.id,
           title: v.title || "Untitled Video",
           thumbnail: v.thumbnail || "https://via.placeholder.com/150",
@@ -69,7 +71,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onGoBack }) => {
 
 
     // ✅ Fetch videos you liked or commented on (likes >= 1 or comments >= 1)
-    fetch("http://localhost:3002/videos", {
+    fetch("http://98.70.25.253:3002/videos", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

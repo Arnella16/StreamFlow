@@ -1,0 +1,104 @@
+services:
+  # --- 1. INFRASTRUCTURE ---
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - esdata:/usr/share/elasticsearch/data 
+    restart: always
+    networks:
+      - stream-flow-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017" # MongoDB port
+    volumes:
+      - mongodata:/data/db # Persistent data for Mongo
+    restart: always
+    networks:
+      - stream-flow-net
+    # Add a healthcheck for Mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+  
+  # --- 2. APPLICATION SERVICES ---
+  
+  go-search-service:
+    # Build the Dockerfile inside the 'go-search-service' folder
+    #build: ./go-search-service
+    image: stream-flow-go-search-service:latest #using local image cos im testing other parts
+    ports:
+      - "8080:8080" 
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: always
+    networks:
+      - stream-flow-net
+      
+  go-upload-service:
+    # Build the Dockerfile inside the 'go-upload-service' folder
+    #build: ./go-upload-service 
+    image: stream-flow-go-upload-service:latest #using local image cos im testing other parts
+    ports:
+      - "3001:3001"
+    environment:
+      - SEARCH_SERVICE_URL=http://go-search-service:8080
+      - SOCIAL_SERVICE_URL=http://localhost:3002 # (Will fail gracefully)
+      - PUBLIC_URL=http://localhost:3001
+    depends_on:
+      - go-search-service
+    volumes:
+      - uploads-volume:/app/uploads
+    restart: always
+    networks:
+      - stream-flow-net
+
+  go-playback-service:
+    build: ./go-playback-service # <-- Builds this folder
+    ports:
+      - "8083:8083"
+    volumes:
+      - uploads-volume:/app/uploads # *Same* shared volume
+    restart: always
+    networks:
+      - stream-flow-net
+          
+  go-auth-service:
+    build: ./go-auth-service # <-- Builds this folder
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017 
+      - JWT_SECRET=a-very-strong-secret-key-for-local-dev
+    depends_on:
+      mongodb: { condition: service_healthy } # Wait for Mongo to be healthy
+    restart: always
+    networks:
+      - stream-flow-net
+
+# Define the persistent volumes
+volumes:
+  esdata:
+  mongodata:
+  uploads-volume:
+
+networks:
+  stream-flow-net:
